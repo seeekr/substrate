@@ -135,12 +135,12 @@
 //! decl_module! {
 //!     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 //!
-//! 		fn proxy_set_approvals(origin, votes: Vec<bool>, index: VoteIndex) -> Result {
-//! 			let who = <democracy::Module<T>>::proxy(ensure_signed(origin)?).ok_or("not a proxy")?;
-//! 			// set approvals
-//! 			Ok(())
-//! 		}
-//! 	}
+//!         fn proxy_set_approvals(origin, votes: Vec<bool>, index: VoteIndex) -> Result {
+//!             let who = <democracy::Module<T>>::proxy(ensure_signed(origin)?).ok_or("not a proxy")?;
+//!             // set approvals
+//!             Ok(())
+//!         }
+//!     }
 //! }
 //! # fn main(){}
 //! ```
