@@ -66,6 +66,8 @@ decl_event!(
 decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: <T as system::Trait>::Origin {
 		fn deposit_event<T>() = default;
+
+		/// Make a proposal. Only councillors can make proposals.
 		fn propose(origin, #[compact] threshold: u32, proposal: Box<<T as Trait>::Proposal>) {
 			let who = ensure_signed(origin)?;
 
@@ -89,6 +91,7 @@ decl_module! {
 			}
 		}
 
+		/// Vote on a proposal. Only councillors can vote on proposals.
 		fn vote(origin, proposal: T::Hash, #[compact] index: ProposalIndex, approve: bool) {
 			let who = ensure_signed(origin)?;
 
@@ -159,7 +162,7 @@ decl_storage! {
 		pub Proposals get(proposals): Vec<T::Hash>;
 		/// Actual proposal for a given hash, if it's current.
 		pub ProposalOf get(proposal_of): map T::Hash => Option< <T as Trait>::Proposal >;
-		/// Votes for a given proposal: (required_yes_votes, yes_voters, no_voters).
+		/// Votes for a given proposal: (proposal_index, required_yes_votes, yes_voters, no_voters).
 		pub Voting get(voting): map T::Hash => Option<(ProposalIndex, u32, Vec<T::AccountId>, Vec<T::AccountId>)>;
 		/// Proposals so far.
 		pub ProposalCount get(proposal_count): u32;
@@ -170,6 +173,7 @@ decl_storage! {
 }
 
 impl<T: Trait> Module<T> {
+	/// Returns true if `who` is an active councillor.
 	pub fn is_councillor(who: &T::AccountId) -> bool {
 		<Council<T>>::active_council().iter()
 			.any(|&(ref a, _)| a == who)
@@ -187,6 +191,7 @@ pub fn ensure_council_members<OuterOrigin>(o: OuterOrigin, n: u32) -> result::Re
 	}
 }
 
+/// Phantom struct to ensure that an `origin` is a councillor.
 pub struct EnsureMembers<N: U32>(::rstd::marker::PhantomData<N>);
 impl<O, N: U32> EnsureOrigin<O> for EnsureMembers<N>
 	where O: Into<Option<Origin>>

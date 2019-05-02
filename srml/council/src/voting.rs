@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Council proposal voting, tallying and vetoing.
+//! Council proposal voting, tallying, and vetoing.
 
 use rstd::prelude::*;
 use rstd::borrow::Borrow;
@@ -34,6 +34,8 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		fn deposit_event<T>() = default;
 
+		/// Make a proposal. Only councillors can make a proposal and the proposer must
+		/// still be a councillor when the vote will occur.
 		fn propose(origin, proposal: Box<T::Proposal>) {
 			let who = ensure_signed(origin)?;
 
@@ -55,6 +57,7 @@ decl_module! {
 			<CouncilVoteOf<T>>::insert((proposal_hash, who.clone()), true);
 		}
 
+		/// Vote on a proposal. Only councillors may vote on council proposals.
 		fn vote(origin, proposal: T::Hash, approve: bool) {
 			let who = ensure_signed(origin)?;
 
@@ -66,6 +69,7 @@ decl_module! {
 			<CouncilVoteOf<T>>::insert((proposal, who), approve);
 		}
 
+		/// Veto a proposal. Only councillors may veto council proposals.
 		fn veto(origin, proposal_hash: T::Hash) {
 			let who = ensure_signed(origin)?;
 
@@ -94,10 +98,12 @@ decl_module! {
 			}
 		}
 
+		/// Set the cooloff period.
 		fn set_cooloff_period(#[compact] blocks: T::BlockNumber) {
 			<CooloffPeriod<T>>::put(blocks);
 		}
 
+		/// Set the voting period.
 		fn set_voting_period(#[compact] blocks: T::BlockNumber) {
 			<VotingPeriod<T>>::put(blocks);
 		}
@@ -113,14 +119,21 @@ decl_module! {
 
 decl_storage! {
 	trait Store for Module<T: Trait> as CouncilVoting {
+		/// Period (in blocks) that a veto is in effect.
 		pub CooloffPeriod get(cooloff_period) config(): T::BlockNumber = T::BlockNumber::sa(1000);
+		/// Period (in blocks) that a vote is open for.
 		pub VotingPeriod get(voting_period) config(): T::BlockNumber = T::BlockNumber::sa(3);
 		/// Number of blocks by which to delay enactment of successful, non-unanimous-council-instigated referendum proposals.
 		pub EnactDelayPeriod get(enact_delay_period) config(): T::BlockNumber = T::BlockNumber::sa(0);
+		/// A list of proposals by block number and proposal ID.
 		pub Proposals get(proposals) build(|_| vec![]): Vec<(T::BlockNumber, T::Hash)>; // ordered by expiry.
+		/// Map from proposal ID to the proposal.
 		pub ProposalOf get(proposal_of): map T::Hash => Option<T::Proposal>;
+		/// List of voters that have voted on a proposal ID.
 		pub ProposalVoters get(proposal_voters): map T::Hash => Vec<T::AccountId>;
+		/// Map from a proposal ID and proposer to the outcome of the vote.
 		pub CouncilVoteOf get(vote_of): map (T::Hash, T::AccountId) => Option<bool>;
+		/// A veto of a proposal. The veto has an expiry (block number) and a list of vetoers.
 		pub VetoedProposal get(veto_of): map T::Hash => Option<(T::BlockNumber, Vec<T::AccountId>)>;
 	}
 }
@@ -137,12 +150,14 @@ decl_event!(
 );
 
 impl<T: Trait> Module<T> {
+	/// Returns true if there are one or more vetos in effect on a proposal.
 	pub fn is_vetoed<B: Borrow<T::Hash>>(proposal: B) -> bool {
 		Self::veto_of(proposal.borrow())
 			.map(|(expiry, _): (T::BlockNumber, Vec<T::AccountId>)| <system::Module<T>>::block_number() < expiry)
 			.unwrap_or(false)
 	}
 
+	/// Returns true if `who` will still be a councillor at block `n`.
 	pub fn will_still_be_councillor_at(who: &T::AccountId, n: T::BlockNumber) -> bool {
 		<Council<T>>::active_council().iter()
 			.find(|&&(ref a, _)| a == who)
@@ -150,11 +165,13 @@ impl<T: Trait> Module<T> {
 			.unwrap_or(false)
 	}
 
+	/// Returns true if `who` is a councillor.
 	pub fn is_councillor(who: &T::AccountId) -> bool {
 		<Council<T>>::active_council().iter()
 			.any(|&(ref a, _)| a == who)
 	}
 
+	/// Tally the votes for a proposal. Tuple returned is yay, nay, and abstain votes, respectively.
 	pub fn tally(proposal_hash: &T::Hash) -> (u32, u32, u32) {
 		Self::generic_tally(proposal_hash, |w: &T::AccountId, p: &T::Hash| Self::vote_of((*p, w.clone())))
 	}

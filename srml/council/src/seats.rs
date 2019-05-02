@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Council member seat candidacy, voting, approval and maintenance.
+//! Council member seat candidacy, voting, approval, and maintenance.
 
 use rstd::prelude::*;
 use primitives::traits::{Zero, One, As, StaticLookup};
@@ -41,9 +41,11 @@ use system::{self, ensure_signed};
 // public operations:
 // - express approvals (you pay in a "voter" bond the first time you do this; O(1); one extra DB entry, one DB change)
 // - remove active voter (you get your "voter" bond back; O(1); one fewer DB entry, one DB change)
-// - remove inactive voter (either you or the target is removed; if the target, you get their "voter" bond back; O(1); one fewer DB entry, one DB change)
+// - remove inactive voter (either you or the target is removed; if the target, you get their "voter" bond back; O(1);
+// one fewer DB entry, one DB change)
 // - submit candidacy (you pay a "candidate" bond; O(1); one extra DB entry, two DB changes)
-// - present winner/runner-up (you may pay a "presentation" bond of O(voters) if the presentation is invalid; O(voters) compute; )
+// - present winner/runner-up (you may pay a "presentation" bond of O(voters) if the presentation is invalid;
+// O(voters) compute; )
 // protected operations:
 // - remove candidacy (remove all votes for a candidate) (one fewer DB entry, two DB changes)
 
@@ -62,7 +64,7 @@ use system::{self, ensure_signed};
 
 // for B blocks following, there's a counting period whereby each of the candidates that believe
 // they fall in the top K+C voted can present themselves. they get the total stake
-// recorded (based on the snapshot); an ordered list is maintained (the leaderboard). Noone may
+// recorded (based on the snapshot); an ordered list is maintained (the leaderboard). No one may
 // present themselves that, if elected, would result in being included twice on the council
 // (important since existing councillors will have their approval votes as it may be that they
 // don't get removed), nor if existing presenters would mean they're not in the top K+C.
@@ -82,6 +84,7 @@ use system::{self, ensure_signed};
 
 use srml_support::decl_module;
 
+/// Index for the total number of votes that have happened or are in progress.
 pub type VoteIndex = u32;
 
 type BalanceOf<T> = <<T as democracy::Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
@@ -213,9 +216,10 @@ decl_module! {
 			<CandidateCount<T>>::put(count as u32 + 1);
 		}
 
-		/// Claim that `signed` is one of the top Self::carry_count() + current_vote().1 candidates.
-		/// Only works if the `block_number >= current_vote().0` and `< current_vote().0 + presentation_duration()``
-		/// `signed` should have at least
+		/// Present a candidate to be inserted into the leaderboard.
+		///
+		/// The presenter (`origin`) must be slashable and will be slashed in the cases
+		/// of an incorrect total or a duplicate presentation.
 		fn present_winner(
 			origin,
 			candidate: <T::Lookup as StaticLookup>::Source,
@@ -268,15 +272,15 @@ decl_module! {
 			}
 		}
 
-		/// Set the desired member count; if less than or equal to the amount of seats to be retained, then seats will not
-		/// be up for election when they expire. If more, then a new vote will be started if one is not already
-		/// in progress.
+		/// Set the desired member count; if less than or equal to the number of seats to be retained,
+		/// then seats will not be up for election when they expire. If more, then a new vote will be
+		/// started if one is not already in progress.
 		fn set_desired_seats(#[compact] count: u32) {
 			<DesiredSeats<T>>::put(count);
 		}
 
 		/// Remove a particular member. A tally will happen instantly (if not already in a presentation
-		/// period) to fill the seat if removal means that the desired members are not met.
+		/// period) to fill the seat if removal means that the desired number of members is not met.
 		/// This is effective immediately.
 		fn remove_member(who: <T::Lookup as StaticLookup>::Source) {
 			let who = T::Lookup::lookup(who)?;
@@ -287,14 +291,12 @@ decl_module! {
 			<ActiveCouncil<T>>::put(new_council);
 		}
 
-		/// Set the presentation duration. If there is currently a vote being presented for, will
-		/// invoke `finalize_vote`.
+		/// Set the presentation duration (number of blocks).
 		fn set_presentation_duration(#[compact] count: T::BlockNumber) {
 			<PresentationDuration<T>>::put(count);
 		}
 
-		/// Set the term duration. If there is current a vote being presented for, will
-		/// invoke `finalize_vote`.
+		/// Set the term duration.
 		fn set_term_duration(#[compact] count: T::BlockNumber) {
 			<TermDuration<T>>::put(count);
 		}
@@ -322,7 +324,7 @@ decl_storage! {
 		pub CarryCount get(carry_count) config(): u32 = 2;
 		/// How long to give each top candidate to present themselves after the vote ends.
 		pub PresentationDuration get(presentation_duration) config(): T::BlockNumber = T::BlockNumber::sa(1000);
-		/// How many vote indexes need to go by after a target voter's last vote before they can be reaped if their
+		/// How many vote indeces need to go by after a target voter's last vote before they can be reaped if their
 		/// approvals are moot.
 		pub InactiveGracePeriod get(inactivity_grace_period) config(inactive_grace_period): VoteIndex = 1;
 		/// How often (in blocks) to check for new votes.
@@ -334,9 +336,9 @@ decl_storage! {
 
 		// permanent state (always relevant, changes only at the finalization of voting)
 		/// The current council. When there's a vote going on, this should still be used for executive
-		/// matters. The block number (second element in the tuple) is the block that their position is
-		/// active until (calculated by the sum of the block number when the council member was elected
-		/// and their term duration).
+		/// matters. The block number (second element in the tuple) is the block that the associated
+		/// account ID's position is active until (calculated by the sum of the block number when the
+		/// council member was elected and his or her term duration).
 		pub ActiveCouncil get(active_council) config(): Vec<(T::AccountId, T::BlockNumber)>;
 		/// The total number of votes that have happened or are in progress.
 		pub VoteCount get(vote_index): VoteIndex;
@@ -345,8 +347,8 @@ decl_storage! {
 		/// A list of votes for each voter, respecting the last cleared vote index that this voter was
 		/// last active at.
 		pub ApprovalsOf get(approvals_of): map T::AccountId => Vec<bool>;
-		/// The vote index and list slot that the candidate `who` was registered or `None` if they are not
-		/// currently registered.
+		/// The vote index and list slot that the candidate account ID was registered or `None` if
+		/// they are not currently registered.
 		pub RegisterInfoOf get(candidate_reg_info): map T::AccountId => Option<(VoteIndex, u32)>;
 		/// The last cleared vote index that this voter was last active at.
 		pub LastActiveOf get(voter_last_active): map T::AccountId => Option<VoteIndex>;
@@ -354,23 +356,25 @@ decl_storage! {
 		pub Voters get(voters): Vec<T::AccountId>;
 		/// The present candidate list.
 		pub Candidates get(candidates): Vec<T::AccountId>; // has holes
+		/// Number of candidates.
 		pub CandidateCount get(candidate_count): u32;
 
 		// temporary state (only relevant during finalization/presentation)
-		/// The accounts holding the seats that will become free on the next tally.
+		/// The accounts holding the seats that will become free on the next tally. Tuple of the block number
+		/// at which they will become free, the number of seats, and a list of the account IDs.
 		pub NextFinalize get(next_finalize): Option<(T::BlockNumber, u32, Vec<T::AccountId>)>;
 		/// The stakes as they were at the point that the vote ended.
 		pub SnapshotedStakes get(snapshoted_stakes): Vec<BalanceOf<T>>;
-		/// Get the leaderboard if we;re in the presentation phase.
+		/// Get the leaderboard if we're in the presentation phase.
 		pub Leaderboard get(leaderboard): Option<Vec<(BalanceOf<T>, T::AccountId)> >; // ORDERED low -> high
 	}
 }
 
 decl_event!(
 	pub enum Event<T> where <T as system::Trait>::AccountId {
-		/// reaped voter, reaper
+		/// A voter has been reaped. The tuple corresponds to voter and reaper, respectively.
 		VoterReaped(AccountId, AccountId),
-		/// slashed reaper
+		/// A reaper has been slashed.
 		BadReaperSlashed(AccountId),
 		/// A tally (for approval votes of council seat(s)) has started.
 		TallyStarted(u32),
@@ -387,12 +391,12 @@ impl<T: Trait> Module<T> {
 		<NextFinalize<T>>::exists()
 	}
 
-	/// If `who` a candidate at the moment?
+	/// True if `who` is a candidate at the moment.
 	pub fn is_a_candidate(who: &T::AccountId) -> bool {
 		<RegisterInfoOf<T>>::exists(who)
 	}
 
-	/// Determine the block that a vote can happen on which is no less than `n`.
+	/// Determine the block that a vote can happen on, which is no less than `n`.
 	pub fn next_vote_from(n: T::BlockNumber) -> T::BlockNumber {
 		let voting_period = Self::voting_period();
 		(n + voting_period - One::one()) / voting_period * voting_period
@@ -429,7 +433,7 @@ impl<T: Trait> Module<T> {
 	}
 
 	// Private
-	/// Check there's nothing to do this block
+	/// Check that there's nothing to do this block.
 	fn end_block(block_number: T::BlockNumber) -> Result {
 		if (block_number % Self::voting_period()).is_zero() {
 			if let Some(number) = Self::next_tally() {
@@ -446,24 +450,24 @@ impl<T: Trait> Module<T> {
 		Ok(())
 	}
 
-	/// Remove a voter from the system. Trusts that Self::voters()[index] != voter.
+	/// Remove a voter from the system. Trusts that `Self::voters()[index] != voter`.
 	fn remove_voter(voter: &T::AccountId, index: usize, mut voters: Vec<T::AccountId>) {
 		<Voters<T>>::put({ voters.swap_remove(index); voters });
 		<ApprovalsOf<T>>::remove(voter);
 		<LastActiveOf<T>>::remove(voter);
 	}
 
-	// Actually do the voting.
+	/// Actually do the voting.
 	fn do_set_approvals(who: T::AccountId, votes: Vec<bool>, index: VoteIndex) -> Result {
 		let candidates = Self::candidates();
 
 		ensure!(!Self::presentation_active(), "no approval changes during presentation period");
 		ensure!(index == Self::vote_index(), "incorrect vote index");
-		ensure!(!candidates.is_empty(), "amount of candidates to receive approval votes should be non-zero");
+		ensure!(!candidates.is_empty(), "number of candidates to receive approval votes should be non-zero");
 		// Prevent a vote from voters that provide a list of votes that exceeds the candidates length
 		// since otherwise an attacker may be able to submit a very long list of `votes` that far exceeds
 		// the amount of candidates and waste more computation than a reasonable voting bond would cover.
-		ensure!(candidates.len() >= votes.len(), "amount of candidate approval votes cannot exceed amount of candidates");
+		ensure!(candidates.len() >= votes.len(), "number of candidate approval votes cannot exceed number of candidates");
 
 		if !<LastActiveOf<T>>::exists(&who) {
 			// not yet a voter - deduct bond.
@@ -478,7 +482,7 @@ impl<T: Trait> Module<T> {
 		Ok(())
 	}
 
-	/// Close the voting, snapshot the staking and the number of seats that are actually up for grabs.
+	/// Close the voting. Snapshot the staking and the number of seats that are actually up for grabs.
 	fn start_tally() {
 		let active_council = Self::active_council();
 		let desired_seats = Self::desired_seats() as usize;
@@ -501,10 +505,11 @@ impl<T: Trait> Module<T> {
 		}
 	}
 
-	/// Finalize the vote, removing each of the `removals` and inserting `seats` of the most approved
-	/// candidates in their place. If the total council members is less than the desired membership
+	/// Finalize the vote, removing each of the expiring member seats and inserting seats of the most approved
+	/// candidates in their place. If the total number of council members is less than the desired membership,
 	/// a new vote is started.
-	/// Clears all presented candidates, returning the bond of the elected ones.
+	///
+	/// Clears all presented candidates, returning the bonds of the elected ones.
 	fn finalize_tally() -> Result {
 		<SnapshotedStakes<T>>::kill();
 		let (_, coming, expiring): (T::BlockNumber, u32, Vec<T::AccountId>) =
