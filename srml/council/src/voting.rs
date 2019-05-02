@@ -142,7 +142,7 @@ decl_event!(
 	pub enum Event<T> where <T as system::Trait>::Hash {
 		/// A voting tally has happened for a referendum cancellation vote.
 		/// Last three are yes, no, abstain counts.
-		TallyCancelation(Hash, u32, u32, u32),
+		TallyCancellation(Hash, u32, u32, u32),
 		/// A voting tally has happened for a referendum vote.
 		/// Last three are yes, no, abstain counts.
 		TallyReferendum(Hash, u32, u32, u32),
@@ -218,7 +218,7 @@ impl<T: Trait> Module<T> {
 		while let Some((proposal, proposal_hash)) = Self::take_proposal_if_expiring_at(now) {
 			let tally = Self::take_tally(&proposal_hash);
 			if let Some(&democracy::Call::cancel_referendum(ref_index)) = IsSubType::<democracy::Module<T>>::is_aux_sub_type(&proposal) {
-				Self::deposit_event(RawEvent::TallyCancelation(proposal_hash, tally.0, tally.1, tally.2));
+				Self::deposit_event(RawEvent::TallyCancellation(proposal_hash, tally.0, tally.1, tally.2));
 				if let (_, 0, 0) = tally {
 					<democracy::Module<T>>::internal_cancel_referendum(ref_index.into());
 				}
