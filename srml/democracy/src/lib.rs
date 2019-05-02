@@ -107,8 +107,8 @@
 //!
 //! - `locked_for` - Get the balance locked in support of a proposal.
 //! - `is_active_referendum` - Return true if given index corresponds to an on-going referendum.
-//! - `active_referendums` - Get all referenda that are currently active and their corresponding info. Equivalent
-//!  to the Table of Referenda.
+//! - `active_referendums` - Get all referenda that are currently active and their corresponding info.
+//!  Equivalent to the Table of Referenda.
 //! - `maturing_referendums_at` - Get all referenda ready for tally at block `n`.
 //! - `tally` - Tally the votes for the current proposal.
 //! - `force_proxy` - Forcibly insert a proxy voter for a stash account.
@@ -119,7 +119,8 @@
 //!
 //! ### Prerequisites
 //!
-//! Import the Democracy module and types and derive your runtime's configuration traits from the Democracy module trait.
+//! Import the Democracy module and types and derive your runtime's configuration traits
+//! from the Democracy module trait.
 //!
 //! ### Example from the SRML
 //!
@@ -133,14 +134,14 @@
 //! pub trait Trait: democracy::Trait { }
 //!
 //! decl_module! {
-//!     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+//! 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 //!
-//!         fn proxy_set_approvals(origin, votes: Vec<bool>, index: VoteIndex) -> Result {
-//!             let who = <democracy::Module<T>>::proxy(ensure_signed(origin)?).ok_or("not a proxy")?;
-//!             // set approvals
-//!             Ok(())
-//!         }
-//!     }
+//! 		fn proxy_set_approvals(origin, votes: Vec<bool>, index: VoteIndex) -> Result {
+//! 			let who = <democracy::Module<T>>::proxy(ensure_signed(origin)?).ok_or("not a proxy")?;
+//! 			// set approvals
+//! 			Ok(())
+//! 		}
+//! 	}
 //! }
 //! # fn main(){}
 //! ```
