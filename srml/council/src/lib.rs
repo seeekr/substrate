@@ -100,63 +100,19 @@
 //!
 //! ### Dispatchable Functions
 //!
-//! #### Council Motions
-//!
-//! - `propose` - Create a council proposal using the council motion mechanism by a councillor who provides a vote
-//! threshold.
-//! - `vote` - Update the approval vote tally through active councillors voting on a council proposal.
-//!
-//! #### Council Seats
-//!
-//! - `set_approvals` - Set candidate approvals. Approval slots stay valid as long as candidates in those slots are
-//! registered.
-//! - `proxy_set_approvals` - Set candidate approvals from a proxy. Approval slots stay valid as long as candidates
-//! in those slots are registered.
-//! - `reap_inactive_voter` - Remove a voter. Can be called by anyone who is a voter. At the end of this call,
-//! either the reported or the reportee will get removed.
-//! - `retract_voter` - Remove a voter. All votes are cancelled and the voter deposit is returned.
-//! - `submit_candidacy` - Submit oneself for candidacy. Account must have enough transferrable funds in it to pay
-//! the bond.
-//! - `present_winner` - Present an account as one of the top candidates.
-//! - `set_desired_seats` - Set the desired council member count.
-//! - `remove_member` - Remove a council member immediately. A tally happens instantly (if not already in a
-//! presentation period) to fill the seat if removal means that the desired members are not met.
-//! - `set_presentation_duration` - Set the presentation duration.
-//! - `set_term_duration` - Set the term duration.
-//!
-//! #### Council Voting
-//!
-//! - `propose` - Propose a council proposal.
-//! - `vote` - Vote on a council proposal.
-//! - `veto` - Veto a council proposal.
-//! - `set_cooloff_period` - Specify cooloff period.
-//! - `set_voting_period` - Specify voting period.
+//! The dispatchable functions in the Council module provide the functionality that councillors need.
+//! See the `Call` enums from the motions, seats, and voting modules for details on dispatchable functions.
 //!
 //! ### Public Functions
 //!
-//! #### Council Motions
+//! The public functions provide the functionality for other modules to interact with the Council module.
+//! See the `Module` structs from the motions, seats, and voting modules for details on public functions.
 //!
-//! - `is_councillor` - Check if a councillor is a member of the active council.
+//! ### Example
 //!
-//! #### Council Seats
-//!
-//! - `presentation_active` - Check if we're currently in a presentation period.
-//! - `is_a_candidate` - Check if a specific account ID is a registered candidate.
-//! - `next_vote_from` - Determine the block when a vote can occur.
-//! - `next_tally` - The block number when the tally for the next election will occur.
-//!
-//! #### Council Voting
-//!
-//! - `is_vetoed` - Check if a council proposal has been vetoed.
-//! - `will_still_be_councillor_at` - Check if a councillor will still be a councillor at a specified block number.
-//! - `is_councillor` - Check if a given account ID is a councillor.
-//! - `tally` - The count of the yay and nay votes and abstentions associated with a council proposal.
-//!
-//! ### Snippet: Approve all candidates when additional empty seats are available
-//!
-//! This code snippet includes an `approve_all` public function that could be called by a signed account to approve
-//! the eligibility of all candidates when there are empty council seats and when the tally for the next election
-//! occurs at the current or a future block number.
+//! This code snippet includes an `approve_all` public function that could be called to approve
+//! the eligibility of all candidates when there are empty council seats and when the tally for
+//! the next election occurs at the current or a future block number.
 //!
 //! ```
 //! use srml_support::{decl_module, dispatch::Result};
