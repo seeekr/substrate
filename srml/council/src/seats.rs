@@ -324,7 +324,7 @@ decl_storage! {
 		pub CarryCount get(carry_count) config(): u32 = 2;
 		/// How long to give each top candidate to present themselves after the vote ends.
 		pub PresentationDuration get(presentation_duration) config(): T::BlockNumber = T::BlockNumber::sa(1000);
-		/// How many vote indeces need to go by after a target voter's last vote before they can be reaped if their
+		/// How many vote indices need to go by after a target voter's last vote before they can be reaped if their
 		/// approvals are moot.
 		pub InactiveGracePeriod get(inactivity_grace_period) config(inactive_grace_period): VoteIndex = 1;
 		/// How often (in blocks) to check for new votes.
