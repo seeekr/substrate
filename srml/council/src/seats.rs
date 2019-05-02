@@ -797,7 +797,7 @@ mod tests {
 
 			assert_eq!(Council::candidates().len(), 0);
 
-			assert_noop!(Council::set_approvals(Origin::signed(4), vec![], 0), "amount of candidates to receive approval votes should be non-zero");
+			assert_noop!(Council::set_approvals(Origin::signed(4), vec![], 0), "number of candidates to receive approval votes should be non-zero");
 		});
 	}
 
@@ -809,7 +809,7 @@ mod tests {
 			assert_ok!(Council::submit_candidacy(Origin::signed(5), 0));
 			assert_eq!(Council::candidates().len(), 1);
 
-			assert_noop!(Council::set_approvals(Origin::signed(4), vec![true, true], 0), "amount of candidate approval votes cannot exceed amount of candidates");
+			assert_noop!(Council::set_approvals(Origin::signed(4), vec![true, true], 0), "number of candidate approval votes cannot exceed number of candidates");
 		});
 	}
 
