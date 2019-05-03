@@ -167,7 +167,7 @@ decl_module! {
 			} else {
 				let imbalance = T::Currency::slash_reserved(&reporter, Self::voting_bond()).0;
 				T::BadReaper::on_unbalanced(imbalance);
-				Self::deposit_event(RawEvent::BadReaperSlashed(reporter));
+				Self::deposit_event(RawEvent::BadReporterSlashed(reporter));
 			}
 		}
 
@@ -374,8 +374,8 @@ decl_event!(
 	pub enum Event<T> where <T as system::Trait>::AccountId {
 		/// A voter has been reaped. The tuple corresponds to the reaped voter and reaper, respectively.
 		VoterReaped(AccountId, AccountId),
-		/// A reaper has been slashed.
-		BadReaperSlashed(AccountId),
+		/// A reporter has made an invalid report and has been slashed.
+		BadReporterSlashed(AccountId),
 		/// A tally (for approval votes of council seat(s)) has started.
 		TallyStarted(u32),
 		/// A tally (for approval votes of council seat(s)) has ended (with one or more new members).
