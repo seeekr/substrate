@@ -16,7 +16,7 @@
 
 //! # Council Module
 //!
-//! The Countil module provides tools to manage the council and proposals.
+//! The Council module provides tools to manage the council and proposals.
 //!
 //! - **Seats**
 //! 	- [`seats::Trait`](./seats/trait.Trait.html)
@@ -48,9 +48,9 @@
 //!
 //! - **Council motion:** A mechanism used to enact a proposal.
 //! - **Council origin:** The council (not root) that contains the council motion mechanism.
-//! - **Council proposal validity:** A council proposal is valid when it's unique, hasn't yet been vetoed, and
+//! - **Proposal validity:** A council proposal is valid when it's unique, hasn't yet been vetoed, and
 //! when the council term doesn't expire before the block number when the proposal's voting period ends.
-//! - **Council proposal postponement:** Councillors that abstain from voting may postpone a council proposal from
+//! - **Proposal postponement:** Councillors that abstain from voting may postpone a council proposal from
 //! being approved or rejected. Postponement is equivalent to a veto, which only lasts for the cooloff period.
 //! - **Cooloff period:** Period, in blocks, for which a veto is in effect.
 //!
@@ -61,7 +61,7 @@
 //! - **Referendum:** The means of voting on a proposal.
 //! - **Vote:** A vote of yay or nay from a councillor on a single proposal. Councillors may change their vote.
 //! - **Veto:** A council member may veto any council proposal that exists. A vetoed proposal that's valid is set
-//! aside for a cooloff period. The vetoer cannot propose the proposal again until the veto expires.
+//! aside for a cooloff period. The vetoer cannot re-veto or propose the proposal again until the veto expires.
 //! - **Vote cancellation:** At the end of a given block we cancel all referenda that have been
 //! elevated to the Table of Referenda whose voting period ends at that block and where the outcome of the vote
 //! tally was a unanimous vote to cancel the referendum.
@@ -69,18 +69,21 @@
 //! Referenda that are passed (yay votes are greater than nay votes plus abstainers) are sent to the Democracy
 //! module for a public referendum. If there are no nay votes (abstention is acceptable), then the proposal is
 //! for immediate enactment. Otherwise, there will be a delay period. If the vote is unanimous, then the public
-//! referendum will require a supermajority against to prevent it. Otherwise, it is a simple majority vote.
+//! referendum will require a vote threshold of supermajority against to prevent it. Otherwise,
+//! it is a simple majority vote.
 //!
 //! #### Council Seats
 //!
 //! - **Desired seats:** The number of seats on the council. Can change via governance.
 //! - **Candidacy bond:** Bond required to be a candidate.
-//! - **Voting bond:** Bond required to be permitted to vote.
+//! - **Voting bond:** Bond required to be permitted to vote. Must be held because many voting operations affect
+//! storage. The bond is held to disincent abuse.
 //! - **Candidate approval voting call:** Express candidate approval voting is a public call that anyone may execute
 //! by signing and submitting an extrinsic. We ensure that information about the `origin` where the dispatch initiated
 //! is a signed account using `ensure_signed`.
 //! - **Reaping process:** Councillors may propose the removal of other, inactive councillors. If the claim is not
-//! valid, the reporter will be slashed.
+//! valid, the reporter will be slashed. See the [Staking module](../srml_staking/index.html) for more information
+//! on slashing.
 //!
 //! ### Goals
 //!
@@ -91,10 +94,8 @@
 //! - Tally votes of council proposals by councillors during the proposal's voting period.
 //! - Veto (postpone) council proposals for a cooloff period through abstention by councillors.
 //! - Elevate council proposals to start a public referendum.
-//! - Apply vote thresholds to referenda depending on their associated council proposal voting approval tally.
-//! - Execution referenda once their vote tally reaches the vote threshold level of approval.
-//! - Manage candidacy.
-//! - Reap candidate voters due to valid claims of inactivity.
+//! - Execute referenda once their vote tally reaches the vote threshold level of approval.
+//! - Manage candidacy, including voting, term expiration, and punishment.
 //!
 //! ## Interface
 //!

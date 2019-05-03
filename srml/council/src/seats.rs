@@ -347,7 +347,7 @@ decl_storage! {
 		/// A list of votes for each voter, respecting the last cleared vote index that this voter was
 		/// last active at.
 		pub ApprovalsOf get(approvals_of): map T::AccountId => Vec<bool>;
-		/// The vote index and list slot that the candidate account ID was registered or `None` if
+		/// The vote index and list slot in which the candidate account ID was registered or `None` if
 		/// they are not currently registered.
 		pub RegisterInfoOf get(candidate_reg_info): map T::AccountId => Option<(VoteIndex, u32)>;
 		/// The last cleared vote index that this voter was last active at.
@@ -361,7 +361,7 @@ decl_storage! {
 
 		// temporary state (only relevant during finalization/presentation)
 		/// The accounts holding the seats that will become free on the next tally. Tuple of the block number
-		/// at which they will become free, the number of seats, and a list of the account IDs.
+		/// at which the next tally will occur, the number of seats, and a list of the account IDs.
 		pub NextFinalize get(next_finalize): Option<(T::BlockNumber, u32, Vec<T::AccountId>)>;
 		/// The stakes as they were at the point that the vote ended.
 		pub SnapshotedStakes get(snapshoted_stakes): Vec<BalanceOf<T>>;
@@ -372,7 +372,7 @@ decl_storage! {
 
 decl_event!(
 	pub enum Event<T> where <T as system::Trait>::AccountId {
-		/// A voter has been reaped. The tuple corresponds to voter and reaper, respectively.
+		/// A voter has been reaped. The tuple corresponds to the reaped voter and reaper, respectively.
 		VoterReaped(AccountId, AccountId),
 		/// A reaper has been slashed.
 		BadReaperSlashed(AccountId),
@@ -386,12 +386,12 @@ decl_event!(
 impl<T: Trait> Module<T> {
 	// exposed immutables.
 
-	/// True if we're currently in a presentation period.
+	/// Returns true if we're currently in a presentation period.
 	pub fn presentation_active() -> bool {
 		<NextFinalize<T>>::exists()
 	}
 
-	/// True if `who` is a candidate at the moment.
+	/// Returns true if `who` is a candidate at the moment.
 	pub fn is_a_candidate(who: &T::AccountId) -> bool {
 		<RegisterInfoOf<T>>::exists(who)
 	}
