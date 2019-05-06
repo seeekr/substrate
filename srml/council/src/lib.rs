@@ -44,27 +44,28 @@
 //!
 //! ### Terminology
 //!
-//! #### Council Proposals
+//! #### Council Proposals (motions.rs)
 //!
 //! - **Council motion:** A mechanism used to enact a proposal.
-//! - **Council origin:** The council (not root) that contains the council motion mechanism.
 //! - **Proposal validity:** A council proposal is valid when it's unique, hasn't yet been vetoed, and
 //! when the council term doesn't expire before the block number when the proposal's voting period ends.
 //! - **Proposal postponement:** Councillors that abstain from voting may postpone a council proposal from
 //! being approved or rejected. Postponement is equivalent to a veto, which only lasts for the cooloff period.
 //! - **Cooloff period:** Period, in blocks, for which a veto is in effect.
 //!
-//! #### Council Proposal Voting
+//! #### Council Proposal Voting (voting.rs)
 //!
 //! - **Proposal:** A submission by a councillor. An initial vote of yay from that councillor is applied.
-//! Unlike the Democracy and Treasury modules, the `Proposal` type is very generic.
+//! Unlike the Democracy and Treasury modules, the `Proposal` type is generic and can be anything that
+//! can be dispatched (see [`type Proposal`](./motions/trait.Trait.html#associatedtype.Proposal)).
 //! - **Referendum:** The means of voting on a proposal.
 //! - **Vote:** A vote of yay or nay from a councillor on a single proposal. Councillors may change their vote.
 //! - **Veto:** A council member may veto any council proposal that exists. A vetoed proposal that's valid is set
 //! aside for a cooloff period. The vetoer cannot re-veto or propose the proposal again until the veto expires.
-//! - **Vote cancellation:** At the end of a given block we cancel all referenda that have been
-//! elevated to the Table of Referenda whose voting period ends at that block and where the outcome of the vote
-//! tally was a unanimous vote to cancel the referendum.
+//! - **Elevation:** A referendum can be _elevated_ from the council to a public referendum. This means it has
+//! been passed to the Democracy module for a public vote.
+//! - **Referendum cancellation:** At the end of a given block we cancel all elevated referenda whose voting period
+//! ends at that block and where the outcome of the vote tally was a unanimous vote to cancel the referendum.
 //! - **Voting process to elevate a proposal:** At the end of a given block we tally votes for expiring referenda.
 //! Referenda that are passed (yay votes are greater than nay votes plus abstainers) are sent to the Democracy
 //! module for a public referendum. If there are no nay votes (abstention is acceptable), then the proposal is
@@ -72,15 +73,21 @@
 //! referendum will require a vote threshold of supermajority against to prevent it. Otherwise,
 //! it is a simple majority vote.
 //!
-//! #### Council Seats
+//! #### Council Seats (seats.rs)
 //!
 //! - **Desired seats:** The number of seats on the council. Can change via governance.
 //! - **Candidacy bond:** Bond required to be a candidate.
+//! - **Leaderboard:** A list of candidates and their respective votes in an election, ordered low to high.
+//! - **Presentation:** The act of proposing a candidate for insertion into the leaderboard. Presenting is
+//! `O(number of voters)`, so the presenter must be slashable and will be slashed for duplicate or invalid
+//! presentations. Presentation is only allowed during the "presentation period," after voting has closed.
 //! - **Voting bond:** Bond required to be permitted to vote. Must be held because many voting operations affect
 //! storage. The bond is held to disincent abuse.
-//! - **Candidate approval voting call:** Express candidate approval voting is a public call that anyone may execute
-//! by signing and submitting an extrinsic. We ensure that information about the `origin` where the dispatch initiated
-//! is a signed account using `ensure_signed`.
+//! - **Candidate set approval:** Process of inserting votes for oneself into storage. Can be called by anyone as
+//! long as he or she is already a voter (and thus has a bond reserved) or has enough reservable currency to
+//! place a bond.
+//! - **Tally:** When the voting period ends, a snapshot is taken and votes counted. Upon finalization, the
+//! new council takes effect.
 //! - **Reaping process:** Councillors may propose the removal of other, inactive councillors. If the claim is not
 //! valid, the reporter will be slashed. See the [Staking module](../srml_staking/index.html) for more information
 //! on slashing.
@@ -108,6 +115,28 @@
 //!
 //! The public functions provide the functionality for other modules to interact with the Council module.
 //! See the `Module` structs from the motions, seats, and voting modules for details on public functions.
+//!
+//! ## Usage
+//!
+//! ### Council Election Procedure
+//!
+//! A council vote can proceed as follows:
+//!
+//! 1. Candidates submit themselves for candidacy.
+//! 2. Voting occurs.
+//! 3. Voting period ends and presentation period begins.
+//! 4. Candidates are presented for the leaderboard.
+//! 5. Presentation period ends, votes are tallied, and new council takes effect.
+//! 6. Candidate list is cleared and vote index increased.
+//!
+//! ### Motion Elevation Procedure
+//!
+//! A normal motion elevation would proceed as follows:
+//!
+//! 1. A councillor makes a proposal.
+//! 2. Other councillors vote yay or nay or abstain.
+//! 3. At the end of the voting period the votes are tallied.
+//! 4. If it has passed, then it will be sent to the Democracy module with the vote threshold parameter.
 //!
 //! ### Example
 //!
