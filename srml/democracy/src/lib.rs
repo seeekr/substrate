@@ -457,7 +457,7 @@ impl<T: Trait> Module<T> {
 	}
 
 	/// Get all referenda that are currently active and their corresponding info.
-	pub fn active_referendums() -> Vec<(ReferendumIndex, ReferendumInfo<T::BlockNumber, T::Proposal>)> {
+	pub fn active_referenda() -> Vec<(ReferendumIndex, ReferendumInfo<T::BlockNumber, T::Proposal>)> {
 		let next = Self::next_tally();
 		let last = Self::referendum_count();
 		(next..last).into_iter()
@@ -466,8 +466,8 @@ impl<T: Trait> Module<T> {
 	}
 
 	/// Get all referenda ready for tally at block `n`.
-	pub fn maturing_referendums_at(
-		n: T::BlockNumber,
+	pub fn maturing_referenda_at(
+		n: T::BlockNumber
 	) -> Vec<(ReferendumIndex, ReferendumInfo<T::BlockNumber, T::Proposal>)> {
 		let next = Self::next_tally();
 		let last = Self::referendum_count();
@@ -693,7 +693,7 @@ impl<T: Trait> Module<T> {
 		}
 
 		// tally up votes for any expiring referenda.
-		for (index, info) in Self::maturing_referendums_at(now).into_iter() {
+		for (index, info) in Self::maturing_referenda_at(now).into_iter() {
 			Self::bake_referendum(now.clone(), index, info)?;
 		}
 

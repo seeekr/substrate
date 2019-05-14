@@ -105,7 +105,7 @@
 //! pub type NegativeImbalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
 //!
 //! # fn main() {}
-//!```
+//! ```
 //!
 //! The Staking module uses the `LockableCurrency` trait to lock a stash account's funds:
 //!
@@ -167,7 +167,7 @@ pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
 
 pub trait Subtrait<I: Instance = DefaultInstance>: system::Trait {
 	/// The balance of an account.
-	type Balance: Parameter + Member + SimpleArithmetic + Codec + Default + Copy + As<usize> + As<u64> + MaybeSerializeDebug;
+	type Balance: Parameter + Member + SimpleArithmetic + Codec + Default + Copy + MaybeSerializeDebug;
 
 	/// A function that is invoked when the free-balance has fallen below the existential deposit and
 	/// has been reduced to zero.
@@ -181,7 +181,7 @@ pub trait Subtrait<I: Instance = DefaultInstance>: system::Trait {
 
 pub trait Trait<I: Instance = DefaultInstance>: system::Trait {
 	/// The balance of an account.
-	type Balance: Parameter + Member + SimpleArithmetic + Codec + Default + Copy + As<usize> + As<u64> + MaybeSerializeDebug;
+	type Balance: Parameter + Member + SimpleArithmetic + Codec + Default + Copy + MaybeSerializeDebug;
 
 	/// A function that is invoked when the free-balance has fallen below the existential deposit and
 	/// has been reduced to zero.
@@ -711,9 +711,14 @@ where
 		if locks.is_empty() {
 			return Ok(())
 		}
+
 		let now = <system::Module<T>>::block_number();
-		if Self::locks(who).into_iter()
-			.all(|l| now >= l.until || new_balance >= l.amount || !l.reasons.contains(reason))
+		if locks.into_iter()
+			.all(|l|
+				now >= l.until
+				|| new_balance >= l.amount
+				|| !l.reasons.contains(reason)
+			)
 		{
 			Ok(())
 		} else {

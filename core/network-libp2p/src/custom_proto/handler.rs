@@ -26,11 +26,10 @@ use libp2p::core::{
 	upgrade::{InboundUpgrade, OutboundUpgrade}
 };
 use log::{debug, error};
-use smallvec::SmallVec;
-use std::{error, fmt, io, marker::PhantomData, mem, time::Duration, time::Instant};
+use smallvec::{smallvec, SmallVec};
+use std::{borrow::Cow, error, fmt, io, marker::PhantomData, mem, time::Duration};
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_timer::{Delay, clock::Clock};
-use void::Void;
 
 /// Implements the `IntoProtocolsHandler` trait of libp2p.
 ///
@@ -73,13 +72,18 @@ use void::Void;
 /// `Disable` or an `Enable` message from the outer layer. At any time, the outer layer is free to
 /// toggle the handler between the disabled and enabled states.
 ///
-/// When the handler is enabled for the first time, if it is the dialer of the connection, it tries
-/// to open a substream. The substream negotiates either a protocol named `/substrate/xxx`, where
-/// `xxx` is chosen by the user.
+/// When the handler switches to "enabled", it opens a substream and negotiates the protocol named
+/// `/substrate/xxx`, where `xxx` is chosen by the user and depends on the chain.
 ///
-/// Then, we have one unique substream where bidirectional communications happen. If the remote
-/// closes the substream, we consider that we are now disconnected. Re-enabling is performed by
-/// re-opening the substream (even if we are not the dialer of the connection).
+/// For backwards compatibility reasons, when we switch to "enabled" for the first time (while we
+/// are still in "init" mode) and we are the connection listener, we don't open a substream.
+///
+/// In order the handle the situation where both the remote and us get enabled at the same time,
+/// we tolerate multiple substreams open at the same time. Messages are transmitted on an arbitrary
+/// substream. The endpoints don't try to agree on a single substream.
+///
+/// We consider that we are now "closed" if the remote closes all the existing substreams.
+/// Re-opening it can then be performed by closing all active substream and re-opening one.
 ///
 pub struct CustomProtoHandlerProto<TMessage, TSubstream> {
 	/// Configuration for the protocol upgrade to negotiate.
@@ -120,7 +124,6 @@ where
 				init_deadline: Delay::new(clock.now() + Duration::from_secs(5))
 			},
 			events_queue: SmallVec::new(),
-			warm_up_end: clock.now() + Duration::from_secs(5),
 			clock,
 		}
 	}
@@ -144,10 +147,6 @@ pub struct CustomProtoHandler<TMessage, TSubstream> {
 	/// element.
 	events_queue: SmallVec<[ProtocolsHandlerEvent<RegisteredProtocol<TMessage>, (), CustomProtoHandlerOut<TMessage>>; 16]>,
 
-	/// We have a warm-up period after creating the handler during which we don't shut down the
-	/// connection.
-	warm_up_end: Instant,
-
 	/// `Clock` instance that uses the current execution context's source of time.
 	clock: Clock,
 }
@@ -169,11 +168,11 @@ enum ProtocolState<TMessage, TSubstream> {
 		deadline: Delay,
 	},
 
-	/// Backwards-compatible mode. Contains the unique substream that is open.
+	/// Normal operating mode. Contains the substreams that are open.
 	/// If we are in this state, we have sent a `CustomProtocolOpen` message to the outside.
 	Normal {
-		/// The unique substream where bidirectional communications happen.
-		substream: RegisteredProtocolSubstream<TMessage, TSubstream>,
+		/// The substreams where bidirectional communications happen.
+		substreams: SmallVec<[RegisteredProtocolSubstream<TMessage, TSubstream>; 4]>,
 		/// Contains substreams which are being shut down.
 		shutdown: SmallVec<[RegisteredProtocolSubstream<TMessage, TSubstream>; 4]>,
 	},
@@ -193,8 +192,12 @@ enum ProtocolState<TMessage, TSubstream> {
 		reenable: bool,
 	},
 
+	/// In this state, we don't care about anything anymore and need to kill the connection as soon
+	/// as possible.
+	KillAsap,
+
 	/// We sometimes temporarily switch to this state during processing. If we are in this state
-	/// at the beginning of a method, that means something bad happend in the source code.
+	/// at the beginning of a method, that means something bad happened in the source code.
 	Poisoned,
 }
 
@@ -226,8 +229,8 @@ pub enum CustomProtoHandlerOut<TMessage> {
 
 	/// Closed a custom protocol with the remote.
 	CustomProtocolClosed {
-		/// Reason why the substream closed. If `Ok`, then it's a graceful exit (EOF).
-		result: io::Result<()>,
+		/// Reason why the substream closed, for diagnostic purposes.
+		reason: Cow<'static, str>,
 	},
 
 	/// Receives a message on a custom protocol substream.
@@ -284,13 +287,13 @@ where
 					};
 					self.events_queue.push(ProtocolsHandlerEvent::Custom(event));
 					ProtocolState::Normal {
-						substream: incoming.into_iter().next()
-							.expect("We have a check above that incoming isn't empty; QED"),
+						substreams: incoming.into_iter().collect(),
 						shutdown: SmallVec::new()
 					}
 				}
 			}
 
+			st @ ProtocolState::KillAsap => st,
 			st @ ProtocolState::Opening { .. } => st,
 			st @ ProtocolState::Normal { .. } => st,
 			ProtocolState::Disabled { shutdown, .. } => {
@@ -315,25 +318,18 @@ where
 				ProtocolState::Disabled { shutdown, reenable: false }
 			}
 
-			ProtocolState::Opening { .. } => {
-				ProtocolState::Disabled { shutdown: SmallVec::new(), reenable: false }
-			}
-
-			ProtocolState::Normal { mut substream, mut shutdown } => {
-				substream.shutdown();
-				shutdown.push(substream);
-				let event = CustomProtoHandlerOut::CustomProtocolClosed {
-					result: Ok(())
-				};
-				self.events_queue.push(ProtocolsHandlerEvent::Custom(event));
-				ProtocolState::Disabled {
-					shutdown: shutdown.into_iter().collect(),
-					reenable: false
-				}
-			}
+			ProtocolState::Opening { .. } | ProtocolState::Normal { .. } =>
+				// At the moment, if we get disabled while things were working, we kill the entire
+				// connection in order to force a reset of the state.
+				// This is obviously an extremely shameful way to do things, but at the time of
+				// the writing of this comment, the networking works very poorly and a solution
+				// needs to be found.
+				ProtocolState::KillAsap,
 
 			ProtocolState::Disabled { shutdown, .. } =>
 				ProtocolState::Disabled { shutdown, reenable: false },
+
+			ProtocolState::KillAsap => ProtocolState::KillAsap,
 		};
 	}
 
@@ -341,13 +337,12 @@ where
 	#[must_use]
 	fn poll_state(&mut self)
 		-> Option<ProtocolsHandlerEvent<RegisteredProtocol<TMessage>, (), CustomProtoHandlerOut<TMessage>>> {
-		let return_value;
-		self.state = match mem::replace(&mut self.state, ProtocolState::Poisoned) {
+		match mem::replace(&mut self.state, ProtocolState::Poisoned) {
 			ProtocolState::Poisoned => {
 				error!(target: "sub-libp2p", "Handler with {:?} is in poisoned state",
 					self.remote_peer_id);
-				return_value = None;
-				ProtocolState::Poisoned
+				self.state = ProtocolState::Poisoned;
+				None
 			}
 
 			ProtocolState::Init { substreams, mut init_deadline } => {
@@ -361,8 +356,8 @@ where
 					Err(_) => error!(target: "sub-libp2p", "Tokio timer has errored")
 				}
 
-				return_value = None;
-				ProtocolState::Init { substreams, init_deadline }
+				self.state = ProtocolState::Init { substreams, init_deadline };
+				None
 			}
 
 			ProtocolState::Opening { mut deadline } => {
@@ -373,63 +368,76 @@ where
 							is_severe: true,
 							error: "Timeout when opening protocol".to_string().into(),
 						};
-						return_value = Some(ProtocolsHandlerEvent::Custom(event));
-						ProtocolState::Opening { deadline }
+						self.state = ProtocolState::Opening { deadline };
+						Some(ProtocolsHandlerEvent::Custom(event))
 					},
 					Ok(Async::NotReady) => {
-						return_value = None;
-						ProtocolState::Opening { deadline }
+						self.state = ProtocolState::Opening { deadline };
+						None
 					},
 					Err(_) => {
 						error!(target: "sub-libp2p", "Tokio timer has errored");
 						deadline.reset(self.clock.now() + Duration::from_secs(60));
-						return_value = None;
-						ProtocolState::Opening { deadline }
+						self.state = ProtocolState::Opening { deadline };
+						None
 					},
 				}
 			}
 
-			ProtocolState::Normal { mut substream, shutdown } => {
-				match substream.poll() {
-					Ok(Async::Ready(Some(RegisteredProtocolEvent::Message(message)))) => {
-						let event = CustomProtoHandlerOut::CustomMessage {
-							message
-						};
-						return_value = Some(ProtocolsHandlerEvent::Custom(event));
-						ProtocolState::Normal { substream, shutdown }
-					},
-					Ok(Async::Ready(Some(RegisteredProtocolEvent::Clogged { messages }))) => {
-						let event = CustomProtoHandlerOut::Clogged {
-							messages,
-						};
-						return_value = Some(ProtocolsHandlerEvent::Custom(event));
-						ProtocolState::Normal { substream, shutdown }
-					}
-					Ok(Async::NotReady) => {
-						return_value = None;
-						ProtocolState::Normal { substream, shutdown }
-					}
-					Ok(Async::Ready(None)) => {
-						let event = CustomProtoHandlerOut::CustomProtocolClosed {
-							result: Ok(())
-						};
-						return_value = Some(ProtocolsHandlerEvent::Custom(event));
-						ProtocolState::Disabled {
-							shutdown: shutdown.into_iter().collect(),
-							reenable: true
+			ProtocolState::Normal { mut substreams, mut shutdown } => {
+				for n in (0..substreams.len()).rev() {
+					let mut substream = substreams.swap_remove(n);
+					match substream.poll() {
+						Ok(Async::NotReady) => substreams.push(substream),
+						Ok(Async::Ready(Some(RegisteredProtocolEvent::Message(message)))) => {
+							let event = CustomProtoHandlerOut::CustomMessage {
+								message
+							};
+							substreams.push(substream);
+							self.state = ProtocolState::Normal { substreams, shutdown };
+							return Some(ProtocolsHandlerEvent::Custom(event));
+						},
+						Ok(Async::Ready(Some(RegisteredProtocolEvent::Clogged { messages }))) => {
+							let event = CustomProtoHandlerOut::Clogged {
+								messages,
+							};
+							substreams.push(substream);
+							self.state = ProtocolState::Normal { substreams, shutdown };
+							return Some(ProtocolsHandlerEvent::Custom(event));
 						}
-					}
-					Err(err) => {
-						let event = CustomProtoHandlerOut::CustomProtocolClosed {
-							result: Err(err),
-						};
-						return_value = Some(ProtocolsHandlerEvent::Custom(event));
-						ProtocolState::Disabled {
-							shutdown: shutdown.into_iter().collect(),
-							reenable: true
+						Ok(Async::Ready(None)) => {
+							shutdown.push(substream);
+							if substreams.is_empty() {
+								let event = CustomProtoHandlerOut::CustomProtocolClosed {
+									reason: "All substreams have been closed by the remote".into(),
+								};
+								self.state = ProtocolState::Disabled {
+									shutdown: shutdown.into_iter().collect(),
+									reenable: true
+								};
+								return Some(ProtocolsHandlerEvent::Custom(event));
+							}
+						}
+						Err(err) => {
+							if substreams.is_empty() {
+								let event = CustomProtoHandlerOut::CustomProtocolClosed {
+									reason: format!("Error on the last substream: {:?}", err).into(),
+								};
+								self.state = ProtocolState::Disabled {
+									shutdown: shutdown.into_iter().collect(),
+									reenable: true
+								};
+								return Some(ProtocolsHandlerEvent::Custom(event));
+							} else {
+								debug!(target: "sub-libp2p", "Error on extra substream: {:?}", err);
+							}
 						}
 					}
 				}
+
+				// This code is reached is none if and only if none of the substreams are in a ready state.
+				self.state = ProtocolState::Normal { substreams, shutdown };
+				None
 			}
 
 			ProtocolState::Disabled { mut shutdown, reenable } => {
@@ -437,21 +445,21 @@ where
 				// If `reenable` is `true`, that means we should open the substreams system again
 				// after all the substreams are closed.
 				if reenable && shutdown.is_empty() {
-					return_value = Some(ProtocolsHandlerEvent::OutboundSubstreamRequest {
+					self.state = ProtocolState::Opening {
+						deadline: Delay::new(self.clock.now() + Duration::from_secs(60))
+					};
+					Some(ProtocolsHandlerEvent::OutboundSubstreamRequest {
 						protocol: SubstreamProtocol::new(self.protocol.clone()),
 						info: (),
-					});
-					ProtocolState::Opening {
-						deadline: Delay::new(self.clock.now() + Duration::from_secs(60))
-					}
+					})
 				} else {
-					return_value = None;
-					ProtocolState::Disabled { shutdown, reenable }
+					self.state = ProtocolState::Disabled { shutdown, reenable };
+					None
 				}
 			}
-		};
 
-		return_value
+			ProtocolState::KillAsap => None,
+		}
 	}
 
 	/// Called by `inject_fully_negotiated_inbound` and `inject_fully_negotiated_outbound`.
@@ -481,17 +489,14 @@ where
 				};
 				self.events_queue.push(ProtocolsHandlerEvent::Custom(event));
 				ProtocolState::Normal {
-					substream,
+					substreams: smallvec![substream],
 					shutdown: SmallVec::new()
 				}
 			}
 
-			ProtocolState::Normal { substream: existing, mut shutdown } => {
-				debug!(target: "sub-libp2p", "Received extra substream after having already one \
-					open in backwards-compatibility mode with {:?}", self.remote_peer_id);
-				substream.shutdown();
-				shutdown.push(substream);
-				ProtocolState::Normal { substream: existing, shutdown }
+			ProtocolState::Normal { substreams: mut existing, shutdown } => {
+				existing.push(substream);
+				ProtocolState::Normal { substreams: existing, shutdown }
 			}
 
 			ProtocolState::Disabled { mut shutdown, .. } => {
@@ -499,14 +504,16 @@ where
 				shutdown.push(substream);
 				ProtocolState::Disabled { shutdown, reenable: false }
 			}
+
+			ProtocolState::KillAsap => ProtocolState::KillAsap,
 		};
 	}
 
 	/// Sends a message to the remote.
 	fn send_message(&mut self, message: TMessage) {
 		match self.state {
-			ProtocolState::Normal { ref mut substream, .. } =>
-				substream.send_message(message),
+			ProtocolState::Normal { ref mut substreams, .. } =>
+				substreams[0].send_message(message),
 
 			_ => debug!(target: "sub-libp2p", "Tried to send message over closed protocol \
 				with {:?}", self.remote_peer_id)
@@ -519,7 +526,7 @@ where TSubstream: AsyncRead + AsyncWrite, TMessage: CustomMessage {
 	type InEvent = CustomProtoHandlerIn<TMessage>;
 	type OutEvent = CustomProtoHandlerOut<TMessage>;
 	type Substream = TSubstream;
-	type Error = Void;
+	type Error = ConnectionKillError;
 	type InboundProtocol = RegisteredProtocol<TMessage>;
 	type OutboundProtocol = RegisteredProtocol<TMessage>;
 	type OutboundOpenInfo = ();
@@ -566,22 +573,11 @@ where TSubstream: AsyncRead + AsyncWrite, TMessage: CustomMessage {
 	}
 
 	fn connection_keep_alive(&self) -> KeepAlive {
-		if self.warm_up_end >= self.clock.now() {
-			return KeepAlive::Until(self.warm_up_end)
-		}
-
-		let mut keep_forever = false;
-
 		match self.state {
-			ProtocolState::Init { .. } | ProtocolState::Opening { .. } => {}
-			ProtocolState::Normal { .. } => keep_forever = true,
-			ProtocolState::Disabled { .. } | ProtocolState::Poisoned => return KeepAlive::No,
-		}
-
-		if keep_forever {
-			KeepAlive::Yes
-		} else {
-			KeepAlive::No
+			ProtocolState::Init { .. } | ProtocolState::Opening { .. } |
+			ProtocolState::Normal { .. } => KeepAlive::Yes,
+			ProtocolState::Disabled { .. } | ProtocolState::Poisoned |
+      ProtocolState::KillAsap => KeepAlive::No,
 		}
 	}
 
@@ -595,6 +591,11 @@ where TSubstream: AsyncRead + AsyncWrite, TMessage: CustomMessage {
 		if !self.events_queue.is_empty() {
 			let event = self.events_queue.remove(0);
 			return Ok(Async::Ready(event))
+		}
+
+		// Kill the connection if needed.
+		if let ProtocolState::KillAsap = self.state {
+			return Err(ConnectionKillError);
 		}
 
 		// Process all the substreams.
@@ -631,5 +632,18 @@ where TSubstream: AsyncRead + AsyncWrite, TMessage: CustomMessage {
 			}
 		}
 		list.push(substream);
+	}
+}
+
+/// Error returned when switching from normal to disabled.
+#[derive(Debug)]
+pub struct ConnectionKillError;
+
+impl error::Error for ConnectionKillError {
+}
+
+impl fmt::Display for ConnectionKillError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "Connection kill when switching from normal to disabled")
 	}
 }
