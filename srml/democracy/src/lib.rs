@@ -480,7 +480,8 @@ impl<T: Trait> Module<T> {
 	/// Tally the votes for the current proposal. Returns a tuple with weighted votes for,
 	/// weighted votes against, and total capital represented in the vote.
 	pub fn tally(ref_index: ReferendumIndex) -> (BalanceOf<T>, BalanceOf<T>, BalanceOf<T>) {
-		let (approve, against, capital): (BalanceOf<T>, BalanceOf<T>, BalanceOf<T>) = Self::voters_for(ref_index).iter()
+		let (approve, against, capital): (BalanceOf<T>, BalanceOf<T>, BalanceOf<T>) = Self::voters_for(ref_index)
+			.iter()
 			.map(|voter| (
 				T::Currency::total_balance(voter), Self::vote_of((ref_index, voter.clone()))
 			))
@@ -528,7 +529,12 @@ impl<T: Trait> Module<T> {
 				let lock_periods = if min_lock_periods <= periods { min_lock_periods } else { periods };
 				let balance = T::Currency::total_balance(&delegator);
 				let votes = T::Currency::total_balance(&delegator) * BalanceOf::<T>::sa(lock_periods as u64);
-				let (del_votes, del_balance) = Self::delegated_votes(ref_index, delegator, lock_periods, recursion_limit - 1);
+				let (del_votes, del_balance) = Self::delegated_votes(
+					ref_index,
+					delegator,
+					lock_periods,
+					recursion_limit - 1
+				);
 				(votes_acc + votes + del_votes, balance_acc + balance + del_balance)
 			})
 	}
@@ -613,7 +619,9 @@ impl<T: Trait> Module<T> {
 		let mut public_props = Self::public_props();
 		if let Some((winner_index, _)) = public_props.iter()
 			.enumerate()
-			.max_by_key(|x| Self::locked_for((x.1).0).unwrap_or_else(Zero::zero)/*defensive only: All current public proposals have an amount locked*/)
+			.max_by_key(|x| Self::locked_for((x.1).0).unwrap_or_else(Zero::zero))
+			//										  ^^^^^^^^^^^^^^
+			// defensive only: All current public proposals have an amount locked
 		{
 			let (prop_index, proposal, _) = public_props.swap_remove(winner_index);
 			<PublicProps<T>>::put(public_props);
@@ -653,7 +661,8 @@ impl<T: Trait> Module<T> {
 		// vote strength times the public delay period from now.
 		for (a, vote) in Self::voters_for(index).into_iter()
 			.map(|a| (a.clone(), Self::vote_of((index, a))))
-			// ^^^ defensive only: all items come from `voters`; for an item to be in `voters` there must be a vote registered; qed
+			// ^^^ defensive only: all items come from `voters`;
+			// for an item to be in `voters` there must be a vote registered; qed
 			.filter(|&(_, vote)| vote.is_aye() == approved)	// Just the winning coins
 		{
 			// now plus: the base lock period multiplied by the number of periods this voter offered to
