@@ -476,7 +476,7 @@ decl_module! {
 				Some(system::RawOrigin::Signed(ref account)) if aux_sender.is_none() => {
 					(true, account)
 				},
-				Some(system::RawOrigin::Inherent) if aux_sender.is_some() => {
+				Some(system::RawOrigin::None) if aux_sender.is_some() => {
 					(false, aux_sender.as_ref().expect("checked above"))
 				},
 				_ => return Err("Invalid surcharge claim: origin must be signed or \
@@ -549,10 +549,10 @@ decl_storage! {
 		/// The amount of funds a contract should deposit in order to offset
 		/// the cost of one byte.
 		///
-		/// Let's suppose the deposit is 1,000 EDG/byte and the rent is 1 EDG/byte/day, then a contract
-		/// with 1,000,000 EDG that uses 1,000 bytes of storage would pay no rent.
-		/// But if the balance reduced to 500,000 EDG and the storage stayed the same at 1,000,
-		/// then it would pay 500 EDG/day.
+		/// Let's suppose the deposit is 1,000 BU (balance units)/byte and the rent is 1 BU/byte/day,
+		/// then a contract with 1,000,000 BU that uses 1,000 bytes of storage would pay no rent.
+		/// But if the balance reduced to 500,000 BU and the storage stayed the same at 1,000,
+		/// then it would pay 500 BU/day.
 		RentDepositOffset get(rent_deposit_offset) config(): BalanceOf<T>;
 		/// Reward that is received by the party whose touch has led
 		/// to removal of a contract.

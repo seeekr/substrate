@@ -239,7 +239,8 @@ mod tests {
 			assert_eq!(System::events(), vec![
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Proposed(1, 0, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), 3))
+					event: OuterEvent::motions(RawEvent::Proposed(1, 0, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), 3)),
+					topics: vec![],
 				}
 			]);
 		});
@@ -292,11 +293,13 @@ mod tests {
 			assert_eq!(System::events(), vec![
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Proposed(1, 0, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), 2))
+					event: OuterEvent::motions(RawEvent::Proposed(1, 0, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), 2)),
+					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Voted(1, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), false, 0, 1))
+					event: OuterEvent::motions(RawEvent::Voted(1, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), false, 0, 1)),
+					topics: vec![],
 				}
 			]);
 		});
@@ -314,15 +317,18 @@ mod tests {
 			assert_eq!(System::events(), vec![
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Proposed(1, 0, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), 3))
+					event: OuterEvent::motions(RawEvent::Proposed(1, 0, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), 3)),
+					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Voted(2, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), false, 1, 1))
+					event: OuterEvent::motions(RawEvent::Voted(2, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), false, 1, 1)),
+					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Disapproved(hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into()))
+					event: OuterEvent::motions(RawEvent::Disapproved(hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into())),
+					topics: vec![],
 				}
 			]);
 		});
@@ -340,19 +346,23 @@ mod tests {
 			assert_eq!(System::events(), vec![
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Proposed(1, 0, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), 2))
+					event: OuterEvent::motions(RawEvent::Proposed(1, 0, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), 2)),
+					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Voted(2, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), true, 2, 0))
+					event: OuterEvent::motions(RawEvent::Voted(2, hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), true, 2, 0)),
+					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Approved(hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into()))
+					event: OuterEvent::motions(RawEvent::Approved(hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into())),
+					topics: vec![],
 				},
 				EventRecord {
 					phase: Phase::ApplyExtrinsic(0),
-					event: OuterEvent::motions(RawEvent::Executed(hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), false))
+					event: OuterEvent::motions(RawEvent::Executed(hex!["cd0b662a49f004093b80600415cf4126399af0d27ed6c185abeb1469c17eb5bf"].into(), false)),
+					topics: vec![],
 				}
 			]);
 		});
