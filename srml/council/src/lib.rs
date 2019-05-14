@@ -71,7 +71,8 @@
 //! module for a public referendum. If there are no nay votes (abstention is acceptable), then the proposal is
 //! for immediate enactment. Otherwise, there will be a delay period. If the vote is unanimous, then the public
 //! referendum will require a vote threshold of supermajority against to prevent it. Otherwise,
-//! it is a simple majority vote.
+//! it is a simple majority vote. See [`VoteThreshold`](../srml_democracy/enum.VoteThreshold.html) in the
+//! Democracy module for more details on how votes are approved.
 //!
 //! #### Council Seats (seats.rs)
 //!
