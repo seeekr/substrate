@@ -27,8 +27,10 @@ use rstd::ops::{Add, Mul, Div, Rem};
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize, Debug))]
 pub enum VoteThreshold {
 	/// A supermajority of approvals is needed to pass this vote.
+	/// See [implementation](./trait.Approved.html#method.approved).
 	SuperMajorityApprove,
 	/// A supermajority of rejections is needed to fail this vote.
+	/// See [implementation](./trait.Approved.html#method.approved).
 	SuperMajorityAgainst,
 	/// A simple majority of approvals is needed to pass this vote.
 	SimpleMajority,
@@ -72,21 +74,30 @@ fn compare_rationals<T>(mut n1: T, mut d1: T, mut n2: T, mut d2: T) -> bool
 }
 
 impl<Balance> Approved<Balance> for VoteThreshold
-where Balance: IntegerSquareRoot
-	+ Zero
-	+ Ord
-	+ Add<Balance, Output = Balance>
-	+ Mul<Balance, Output = Balance>
-	+ Div<Balance, Output = Balance>
-	+ Rem<Balance, Output = Balance>
-	+ Copy
+	where Balance: IntegerSquareRoot
+		+ Zero
+		+ Ord
+		+ Add<Balance, Output = Balance>
+		+ Mul<Balance, Output = Balance>
+		+ Div<Balance, Output = Balance>
+		+ Rem<Balance, Output = Balance>
+		+ Copy
 {
-	/// Given `approve` votes for and `against` votes against from a total electorate size of
-	/// `electorate` of whom `voters` voted (`electorate - voters` are abstainers) then returns true if the
-	/// overall outcome is in favor of approval.
+	/// Given:
+	///
+	/// - `approve` votes for a proposal,
+	/// - `against` votes against a proposal,
+	/// - a total electorate size of `electorate`, and
+	/// - the number of `voters` who voted,
+	///
+	/// this function will return true if the overall outcome is in favor of approval.
 	///
 	/// We assume each *voter* may cast more than one *vote*, hence `voters` is not necessarily equal to
-	/// `approve + against`.
+	/// `approve + against`. Likewise, `electorate - voters` are abstainers.
+	///
+	/// If `self` is a `SuperMajority` variant, this implements *Adaptive Quorum Biasing* such
+	/// that the required supermajority increases with lower turnout. As turnout approaches 100%,
+	/// the required majority approaches 50%.
 	fn approved(
 		&self,
 		approve: Balance,

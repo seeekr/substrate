@@ -35,7 +35,9 @@
 //! [Council](../srml_council/index.html) vote, or a majority Council vote. Each method of starting a referendum
 //! comes with a different default vote threshold mechanism.
 //! - **Vote threshold mechanisms:** Different criteria for passing or rejecting a referendum (e.g. supermajority for,
-//! supermajority against, simple majority).
+//! supermajority against, simple majority). Supermajority thresholds are based on *Adaptive Quorum Biasing* such that
+//! the required supermajority increases with lower turnout. As turnout approaches 100%, the required majority
+//! approaches 50%.
 //! - **Table of Referenda:** A set of referenda that are currently open for voting.
 //!
 //! #### Proposal Terminology
