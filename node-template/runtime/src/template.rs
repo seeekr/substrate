@@ -236,3 +236,79 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+	// Import a bunch of things from substrate core. All needed for some parts of the code.
+	use support::{impl_outer_origin, assert_ok};
+	use runtime_io::{with_externalities, TestExternalities};
+	use primitives::{H256, Blake2Hasher};
+	use runtime_primitives::{
+		BuildStorage, traits::{BlakeTwo256, IdentityLookup},
+		testing::{Digest, DigestItem, Header}
+	};
+
+	// TODO: learn this. wtf does it exactly do?
+	impl_outer_origin! {
+		pub enum Origin for KittiesTest {}
+	}
+
+	// Create one empty type for testing.
+	#[derive(Clone, Eq, PartialEq)]
+	pub struct KittiesTest;
+
+
+	// Start implementing the Trait's of all the other modules that you need.
+	// If you want anything that is reasonably functional you also need to implement the System trait.
+	// TODO: justify why system is needed (bc I have seen tests without it. It is for sure not mandatory.)
+	impl system::Trait for KittiesTest {
+		type Origin = Origin;
+		type Index = u64;
+		type BlockNumber = u64;
+		type Hash = H256;
+		type Hashing = BlakeTwo256;
+		type Digest = Digest;
+		type AccountId = u64;
+		type Lookup = IdentityLookup<Self::AccountId>;
+		type Header = Header;
+		type Event = ();
+		type Log = DigestItem;
+	}
+	// And any other trait that your Trait is explicitly bounded by.
+	// Remember you had: `pub trait Trait: balances::Trait`
+	impl balances::Trait for KittiesTest {
+		type Balance = u64;
+		type OnFreeBalanceZero = ();
+		type OnNewAccount = ();
+		type Event = ();
+		type TransactionPayment = ();
+		type TransferPayment = ();
+		type DustRemoval = ();
+	}
+	// And finally, your own trait.
+	impl super::Trait for KittiesTest {
+		type Event = ();
+	}
+
+	// To make any fo the modules more accessible easier:
+	// You can do this for any of the modules, for which you've implemented its Trait for `KittiesTest`.
+	// TODO: explain why module is what we need.
+	type Kitties = super::Module<KittiesTest>;
+	type Balances = balances::Module<KittiesTest>;
+	type System = system::Module<KittiesTest>;
+
+	fn build_ext() -> TestExternalities<Blake2Hasher> {
+		let mut t = system::GenesisConfig::<KittiesTest>::default().build_storage().unwrap().0;
+		t.extend(balances::GenesisConfig::<KittiesTest>::default().build_storage().unwrap().0);
+		// t.extend(GenesisConfig::<KittiesTest>::default().build_ext().unwrap().0);
+		t.into()
+	}
+
+	#[test]
+	fn it_works() {
+		with_externalities(&mut build_ext(), || {
+			
+			assert_ok!(Kitties::create_kitty(Origin::signed(10)));
+		})
+	}
+}
