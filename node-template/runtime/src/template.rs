@@ -237,10 +237,12 @@ impl<T: Trait> Module<T> {
     }
 }
 
+
+// TODO: we probably want to move this to a test.rs to keep the code in the sidebar small. OR not? in favor of having the source and test close to each other?
 #[cfg(test)]
 mod tests {
 	// Import a bunch of things from substrate core. All needed for some parts of the code.
-	use support::{impl_outer_origin, assert_ok};
+	use support::{impl_outer_origin, assert_ok, assert_noop};
 	use runtime_io::{with_externalities, TestExternalities};
 	use primitives::{H256, Blake2Hasher};
 	use runtime_primitives::{
@@ -305,10 +307,62 @@ mod tests {
 	}
 
 	#[test]
-	fn it_works() {
+	fn create_kitty_should_work() {
 		with_externalities(&mut build_ext(), || {
-			
+			// create a kitty with account 10.
+			// TODO: generally: I don't know enough about origin to rant about it.
 			assert_ok!(Kitties::create_kitty(Origin::signed(10)));
+
+			// check (some) storage items.
+			assert_eq!(Kitties::all_kitties_count(), 1);
+			assert_eq!(Kitties::owned_kitty_count(10), 1);
+			// no one else has a kitty, only 10
+			assert_eq!(Kitties::owned_kitty_count(5), 0);
+
+			let hash = Kitties::kitty_by_index(0);
+			assert_eq!(Kitties::owner_of(hash), Some(10));
+
+			let other_hash = Kitties::kitty_of_owner_by_index((10, 0));
+			assert_eq!(hash, other_hash);
+
+			// alternative syntax:
+			use super::KittyOwner;
+			use support::StorageMap;
+			assert_eq!(<KittyOwner<KittiesTest>>::get(hash), Some(10));
+		})
+	}
+
+	#[test]
+	fn transfer_kitty_should_work() {
+		with_externalities(&mut build_ext(), || {
+			// check that 10 own a kitty
+			assert_ok!(Kitties::create_kitty(Origin::signed(10)));
+
+			assert_eq!(Kitties::owned_kitty_count(10), 1);
+			let hash = Kitties::kitty_of_owner_by_index((10, 0));
+
+			// send kitty to 1.
+			assert_ok!(Kitties::transfer(Origin::signed(10), 1, hash));
+
+			// 10 now has nothing
+			assert_eq!(Kitties::owned_kitty_count(10), 0);
+			// but 1 does
+			assert_eq!(Kitties::owned_kitty_count(1), 1);
+			let new_hash = Kitties::kitty_of_owner_by_index((1, 0));
+			// and it has the same hash
+			assert_eq!(hash, new_hash);
+		})
+	}
+
+	#[test]
+	fn transfer_not_owned_kitty_should_fail() {
+		with_externalities(&mut build_ext(), || {
+			// check that 10 own a kitty
+			assert_ok!(Kitties::create_kitty(Origin::signed(10)));
+			let hash = Kitties::kitty_of_owner_by_index((10, 0));
+
+			// account 0 cannot transfer a kitty with this hash.
+			assert_noop!(Kitties::transfer(Origin::signed(9), 1, hash), "You do not own this kitty");
 		})
 	}
 }
