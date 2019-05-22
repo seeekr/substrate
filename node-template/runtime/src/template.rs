@@ -274,6 +274,7 @@ impl<T: Trait> Module<T> {
 // TODO: we probably want to move this to a test.rs to keep the code in the sidebar small. OR not? in favor of having the source and test close to each other?
 #[cfg(test)]
 mod tests {
+    use super::*;
 	// Import a bunch of things from substrate core. All needed for some parts of the code.
 	use support::{impl_outer_origin, assert_ok, assert_noop};
 	use runtime_io::{with_externalities, TestExternalities};
@@ -332,10 +333,21 @@ mod tests {
 	type Balances = balances::Module<KittiesTest>;
 	type System = system::Module<KittiesTest>;
 
+
+    // Vec<(T::AccountId, T::Hash, T::Balance)>;
+    // vec![(0, KITTY1, 50), (0, KITTY2, 100)]
+    // const KITTY1: T::Hash = //TODO generate random.0x8a33a0a66c0e6cf2138574beb3785c7b8b37530dcab6d9d4c734660f8e74f642;
+        // const KITTY2: T::Hash = 0x7b33a0a66c0e6cf2138574beb3785c7b8b37530dcab6d9d4c734660f8e74f642;
+    // const KITTY2: T::Hash;
+
 	fn build_ext() -> TestExternalities<Blake2Hasher> {
 		let mut t = system::GenesisConfig::<KittiesTest>::default().build_storage().unwrap().0;
 		t.extend(balances::GenesisConfig::<KittiesTest>::default().build_storage().unwrap().0);
-		// t.extend(GenesisConfig::<KittiesTest>::default().build_ext().unwrap().0);
+		t.extend(GenesisConfig::<KittiesTest> { // 3. new stuff here
+            kitties: vec![  (0, H256::random(), 50), 
+                            (0, H256::random(), 100)], 
+            ..Default::default() // Do i need this?
+        }.build_storage().unwrap().0);
 		t.into()
 	}
 
@@ -398,4 +410,15 @@ mod tests {
 			assert_noop!(Kitties::transfer(Origin::signed(9), 1, hash), "You do not own this kitty");
 		})
 	}
+
+    #[test]
+    fn should_build_genesis_kitties() {
+        with_externalities(&mut build_ext(), || {
+        
+        assert_ok!(Kitties::create_kitty(Origin::signed(10)));
+		let hash = Kitties::kitty_of_owner_by_index((10, 0));
+        println!("Kitty hash is: {:?}", hash);
+
+        })
+    }
 }
