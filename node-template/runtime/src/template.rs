@@ -35,8 +35,7 @@ decl_event!(
 decl_storage! {
     trait Store for Module<T: Trait> as KittyStorage {
 
-        // 2. mark something as part of genesis config
-        // kitties, populated from list stored in genesis
+        // Step 2. mark something as part of genesis config
         Kitties get(kitty) build(|config: &GenesisConfig<T>| {
             config.kitties.iter()
                 .map(|i| (
@@ -51,14 +50,23 @@ decl_storage! {
                 .collect::<Vec<_>>()
         }): map T::Hash => Kitty<T::Hash, T::Balance>;
 
-        // TODO
-        KittyOwner get(owner_of): map T::Hash => Option<T::AccountId>;
+        KittyOwner get(owner_of) build(|config: &GenesisConfig<T>| {
+            config.kitties.iter().cloned() //address this
+                .map(|i| (i.1, i.0) )
+                .collect::<Vec<_>>()
+        }): map T::Hash => Option<T::AccountId>;
 
-        // TODO
-        AllKittiesArray get(kitty_by_index): map u64 => T::Hash;
+        AllKittiesArray get(kitty_by_index) build(|config: &GenesisConfig<T>| {
+            config.kitties.iter()
+                .enumerate()
+                .map(|(i, k)| (i as u64, k.1) )
+                .collect::<Vec<_>>()
+        }): map u64 => T::Hash;
 
-        // TODO
-        AllKittiesCount get(all_kitties_count): u64;
+        AllKittiesCount get(all_kitties_count) build(|config: &GenesisConfig<T>| {
+            config.kitties.len() as u64
+        }): u64;
+        
         AllKittiesIndex: map T::Hash => u64;
 
         // TODO
@@ -335,13 +343,13 @@ mod tests {
 
 
     // Vec<(T::AccountId, T::Hash, T::Balance)>;
-
+    // Step 3: 
 	fn build_ext() -> TestExternalities<Blake2Hasher> {
 		let mut t = system::GenesisConfig::<KittiesTest>::default().build_storage().unwrap().0;
 		t.extend(balances::GenesisConfig::<KittiesTest>::default().build_storage().unwrap().0);
 		t.extend(GenesisConfig::<KittiesTest> { // 3. new stuff here
             kitties: vec![  (0, H256::random(), 50), 
-                            (0, H256::zero(), 100)], 
+                            (1, H256::zero(), 100)], 
             ..Default::default() // Do i need this?
         }.build_storage().unwrap().0);
 		t.into()
@@ -410,13 +418,23 @@ mod tests {
 		})
 	}
 
+
+// (0, H256::random(), 50), (1, H256::zero(), 100)], 
+    // Step 4
     #[test]
     fn should_build_genesis_kitties() {
         with_externalities(&mut build_ext(), || {
+            // Check that 2nd kitty exists at genesis, with value 100
+            assert_eq!(Kitties::kitty(H256::zero()).price, 100);
             
-            // assert_ok!(Kitties::create_kitty(Origin::signed(10)));
-            // let hash = Kitties::kitty_of_owner_by_index((10, 0));
-            println!("kitties value is: {}", Kitties::kitty(H256::zero()).price);
+            assert_eq!(Kitties::owner_of(H256::zero()), Some(1));
+
+            let kitty0 = Kitties::kitty_by_index(0);
+
+            assert_ne!(kitty0, H256::zero());
+            assert_eq!(Kitties::kitty_by_index(1), H256::zero());
+
+            assert_eq!(Kitties::all_kitties_count(), 2);
 
         })
     }
