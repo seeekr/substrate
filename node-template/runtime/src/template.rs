@@ -34,19 +34,52 @@ decl_event!(
 
 decl_storage! {
     trait Store for Module<T: Trait> as KittyStorage {
-        Kitties get(kitty): map T::Hash => Kitty<T::Hash, T::Balance>;
+
+        // 2. mark something as part of genesis config
+        // kitties, populated from list stored in genesis
+        Kitties get(kitty) build(|config: &GenesisConfig<T>| {
+            config.kitties.iter()
+                .map(|i| (
+                    i.1,
+                    Kitty {
+                        id: i.1,
+                        dna: i.1,
+                        price: i.2,
+                        gen: 0,
+                    }
+                ))
+                .collect::<Vec<_>>()
+        }): map T::Hash => Kitty<T::Hash, T::Balance>;
+
+        // TODO
         KittyOwner get(owner_of): map T::Hash => Option<T::AccountId>;
 
+        // TODO
         AllKittiesArray get(kitty_by_index): map u64 => T::Hash;
+
+        // TODO
         AllKittiesCount get(all_kitties_count): u64;
         AllKittiesIndex: map T::Hash => u64;
 
+        // TODO
         OwnedKittiesArray get(kitty_of_owner_by_index): map (T::AccountId, u64) => T::Hash;
         OwnedKittiesCount get(owned_kitty_count): map T::AccountId => u64;
         OwnedKittiesIndex: map T::Hash => u64;
 
         Nonce: u64;
     }
+
+    // 1. add config 
+    add_extra_genesis {
+        // accessible as config.kitties, randomly create kitties
+        // (0, num of kitties) then call create_kitty(account(num)) to do autominting
+
+        // expect user to provide
+        // account which owns the kitty
+        // hash: kitty dna (also kitty_id)
+        // balance: the price of the kitty
+        config(kitties): Vec<(T::AccountId, T::Hash, T::Balance)>;
+	}
 }
 
 decl_module! {
