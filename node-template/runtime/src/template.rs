@@ -5,6 +5,8 @@ use runtime_primitives::traits::{As, Hash, Zero};
 use parity_codec::{Encode, Decode};
 use rstd::cmp;
 
+use runtime_io::{with_storage, StorageOverlay, ChildrenStorageOverlay};
+
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct Kitty<Hash, Balance> {
@@ -36,58 +38,40 @@ decl_storage! {
     trait Store for Module<T: Trait> as KittyStorage {
 
         // Step 2. mark something as part of genesis config
-        Kitties get(kitty) build(|config: &GenesisConfig<T>| {
-            config.kitties.iter()
-                .map(|i| (
-                    i.1,
-                    Kitty {
-                        id: i.1,
-                        dna: i.1,
-                        price: i.2,
-                        gen: 0,
-                    }
-                ))
-                .collect::<Vec<_>>()
-        }): map T::Hash => Kitty<T::Hash, T::Balance>;
+        Kitties get(kitty): map T::Hash => Kitty<T::Hash, T::Balance>;
+        KittyOwner get(owner_of): map T::Hash => Option<T::AccountId>;
 
-        KittyOwner get(owner_of) build(|config: &GenesisConfig<T>| {
-            config.kitties.iter().cloned() //address this
-                .map(|i| (i.1, i.0) )
-                .collect::<Vec<_>>()
-        }): map T::Hash => Option<T::AccountId>;
-
-        AllKittiesArray get(kitty_by_index) build(|config: &GenesisConfig<T>| {
-            config.kitties.iter()
-                .enumerate()
-                .map(|(i, k)| (i as u64, k.1) )
-                .collect::<Vec<_>>()
-        }): map u64 => T::Hash;
-
-        AllKittiesCount get(all_kitties_count) build(|config: &GenesisConfig<T>| {
-            config.kitties.len() as u64
-        }): u64;
-        
+        AllKittiesArray get(kitty_by_index): map u64 => T::Hash;
+        AllKittiesCount get(all_kitties_count): u64;
         AllKittiesIndex: map T::Hash => u64;
 
-        // TODO
         OwnedKittiesArray get(kitty_of_owner_by_index): map (T::AccountId, u64) => T::Hash;
         OwnedKittiesCount get(owned_kitty_count): map T::AccountId => u64;
         OwnedKittiesIndex: map T::Hash => u64;
-
+        
         Nonce: u64;
     }
 
     // 1. add config 
     add_extra_genesis {
-        // accessible as config.kitties, randomly create kitties
-        // (0, num of kitties) then call create_kitty(account(num)) to do autominting
-
-        // expect user to provide
-        // account which owns the kitty
-        // hash: kitty dna (also kitty_id)
-        // balance: the price of the kitty
         config(kitties): Vec<(T::AccountId, T::Hash, T::Balance)>;
-	}
+        
+        build(|storage: &mut StorageOverlay, _: &mut ChildrenStorageOverlay, config: &GenesisConfig<T>| {
+            with_storage(storage, || {
+                for &(ref acct, hash, balance) in &config.kitties {
+
+                    let k = Kitty {
+                                id: hash,
+                                dna: hash,
+                                price: balance,
+                                gen: 0
+                            };
+                
+                    let _ = <Module<T>>::mint(acct.clone(), hash, k);
+                }
+            });
+        });
+    }
 }
 
 decl_module! {
@@ -236,8 +220,9 @@ impl<T: Trait> Module<T> {
         <OwnedKittiesArray<T>>::insert((to.clone(), owned_kitty_count), kitty_id);
         <OwnedKittiesCount<T>>::insert(&to, new_owned_kitty_count);
         <OwnedKittiesIndex<T>>::insert(kitty_id, owned_kitty_count);
-
-        Self::deposit_event(RawEvent::Created(to, kitty_id));
+        
+        // Removed this so we can use mint() to create genesis storage
+        // Self::deposit_event(RawEvent::Created(to, kitty_id));
 
         Ok(())
     }
@@ -425,16 +410,21 @@ mod tests {
     fn should_build_genesis_kitties() {
         with_externalities(&mut build_ext(), || {
             // Check that 2nd kitty exists at genesis, with value 100
-            assert_eq!(Kitties::kitty(H256::zero()).price, 100);
             
-            assert_eq!(Kitties::owner_of(H256::zero()), Some(1));
-
             let kitty0 = Kitties::kitty_by_index(0);
+            let kitty1 = Kitties::kitty_by_index(1);
 
-            assert_ne!(kitty0, H256::zero());
-            assert_eq!(Kitties::kitty_by_index(1), H256::zero());
-
+            // Check we have 2 kitties, as specified
             assert_eq!(Kitties::all_kitties_count(), 2);
+
+            // Check that they are owned correctly
+            assert_eq!(Kitties::owner_of(kitty0), Some(0));
+            assert_eq!(Kitties::owner_of(kitty1), Some(1));
+
+            // Check owners own the correct amount of kitties
+            assert_eq!(Kitties::owned_kitty_count(0), 1);
+            assert_eq!(Kitties::owned_kitty_count(2), 0);
+            
 
         })
     }
