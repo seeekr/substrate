@@ -18,7 +18,7 @@
 
 use rstd::prelude::*;
 use rstd::borrow::Borrow;
-use primitives::traits::{Hash, As, Zero};
+use primitives::traits::{Hash, Zero};
 use runtime_io::print;
 use srml_support::dispatch::Result;
 use srml_support::{StorageValue, StorageMap, IsSubType, decl_module, decl_storage, decl_event, ensure};
@@ -126,11 +126,11 @@ decl_module! {
 decl_storage! {
 	trait Store for Module<T: Trait> as CouncilVoting {
 		/// Period (in blocks) that a veto is in effect.
-		pub CooloffPeriod get(cooloff_period) config(): T::BlockNumber = T::BlockNumber::sa(1000);
+		pub CooloffPeriod get(cooloff_period) config(): T::BlockNumber = 1000.into();
 		/// Period (in blocks) that a vote is open for.
-		pub VotingPeriod get(voting_period) config(): T::BlockNumber = T::BlockNumber::sa(3);
+		pub VotingPeriod get(voting_period) config(): T::BlockNumber = 3.into();
 		/// Number of blocks by which to delay enactment of successful, non-unanimous-council-instigated referendum proposals.
-		pub EnactDelayPeriod get(enact_delay_period) config(): T::BlockNumber = T::BlockNumber::sa(0);
+		pub EnactDelayPeriod get(enact_delay_period) config(): T::BlockNumber = 0.into();
 		/// A list of proposals by block number and proposal ID.
 		pub Proposals get(proposals) build(|_| vec![]): Vec<(T::BlockNumber, T::Hash)>; // ordered by expiry.
 		/// Map from proposal ID to the proposal.
