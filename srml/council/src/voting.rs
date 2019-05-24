@@ -36,8 +36,10 @@ decl_module! {
 
 		/// Make a proposal.
 		///
+		/// A councillor vote of from `origin` is applied by default.
+		///
 		/// The dispatch origin of this call must be signed by a _councillor_ by the time
-		/// the proposal is subject to voting.
+		/// the proposal is subject to voting. See [`voting_period`](./voting/struct.VotingPeriod.html)
 		fn propose(origin, proposal: Box<T::Proposal>) {
 			let who = ensure_signed(origin)?;
 
@@ -74,6 +76,13 @@ decl_module! {
 		}
 
 		/// Veto a proposal.
+		///
+		/// A proposal cannot be vetoed while in the cooloff period.
+		/// A proposal cannot be vetoed twice by the same account.
+		///
+		/// The proposal information, including voters, are removed and only veto information is kept
+		/// to keep track of when the proposal can be re-proposed, and to make sure no single councillor
+		/// can veto twice.
 		///
 		/// The dispatch origin of this call must be signed by a _councillor_.
 		fn veto(origin, proposal_hash: T::Hash) {
@@ -137,7 +146,7 @@ decl_storage! {
 		pub ProposalOf get(proposal_of): map T::Hash => Option<T::Proposal>;
 		/// List of voters that have voted on a proposal ID.
 		pub ProposalVoters get(proposal_voters): map T::Hash => Vec<T::AccountId>;
-		/// Map from a proposal ID and proposer to the outcome of the vote.
+		/// Map from a proposal ID and voter to the outcome of the vote.
 		pub CouncilVoteOf get(vote_of): map (T::Hash, T::AccountId) => Option<bool>;
 		/// A veto of a proposal. The veto has an expiry (block number) and a list of vetoers.
 		pub VetoedProposal get(veto_of): map T::Hash => Option<(T::BlockNumber, Vec<T::AccountId>)>;
@@ -191,11 +200,17 @@ impl<T: Trait> Module<T> {
 		<VetoedProposal<T>>::remove(proposal);
 	}
 
+	/// Perform and return the tally result of a specific proposal.
+	///
+	/// The returned tuple is: `(approves, rejects, abstainers)`.
 	fn take_tally(proposal_hash: &T::Hash) -> (u32, u32, u32) {
-		Self::generic_tally(proposal_hash, |w: &T::AccountId, p: &T::Hash| <CouncilVoteOf<T>>::take((*p, w.clone())))
+		let vote_of = |w: &T::AccountId, p: &T::Hash| <CouncilVoteOf<T>>::take((*p, w.clone()));
+		Self::generic_tally(proposal_hash, vote_of)
 	}
 
-	fn generic_tally<F: Fn(&T::AccountId, &T::Hash) -> Option<bool>>(proposal_hash: &T::Hash, vote_of: F) -> (u32, u32, u32) {
+	fn generic_tally<F>(proposal_hash: &T::Hash, vote_of: F) -> (u32, u32, u32) where
+		F: Fn(&T::AccountId, &T::Hash) -> Option<bool>
+	{
 		let c = <Council<T>>::active_council();
 		let (approve, reject) = c.iter()
 			.filter_map(|&(ref a, _)| vote_of(a, proposal_hash))
@@ -208,11 +223,15 @@ impl<T: Trait> Module<T> {
 		<Proposals<T>>::put(p);
 	}
 
+	/// return the proposal that was supposed to be expired at block number `n`.
+	///
+	/// The proposal is removed from storage, if any exists.
 	fn take_proposal_if_expiring_at(n: T::BlockNumber) -> Option<(T::Proposal, T::Hash)> {
 		let proposals = Self::proposals();
+		// sorted from earliest to latest expiry.
 		match proposals.first() {
 			Some(&(expiry, hash)) if expiry == n => {
-				// yes this is horrible, but fixing it will need substantial work in storage.
+				// NOTE: yes this is horrible, but fixing it will need substantial work in storage.
 				Self::set_proposals(&proposals[1..].to_vec());
 				<ProposalOf<T>>::take(hash).map(|p| (p, hash))	/* defensive only: all queued proposal hashes must have associated proposals*/
 			}
@@ -220,16 +239,25 @@ impl<T: Trait> Module<T> {
 		}
 	}
 
+	/// Checks for the end of the voting period at the end of each block.
+	///
+	/// Might end up:
+	///   - cancel a referendum.
+	///   - enact immediately or with a delay
+	/// based on the votes and the type of the proposal
 	fn end_block(now: T::BlockNumber) -> Result {
 		while let Some((proposal, proposal_hash)) = Self::take_proposal_if_expiring_at(now) {
 			let tally = Self::take_tally(&proposal_hash);
+			// If the proposal is to kill an already existing referendum `ref_index`.
 			if let Some(&democracy::Call::cancel_referendum(ref_index)) = IsSubType::<democracy::Module<T>>::is_aux_sub_type(&proposal) {
 				Self::deposit_event(RawEvent::TallyCancellation(proposal_hash, tally.0, tally.1, tally.2));
+				// must have no nay and no abstains
 				if let (_, 0, 0) = tally {
 					<democracy::Module<T>>::internal_cancel_referendum(ref_index.into());
 				}
 			} else {
 				Self::deposit_event(RawEvent::TallyReferendum(proposal_hash.clone(), tally.0, tally.1, tally.2));
+				// More yay then nay and abstain. Will be enacted either immediately or with a delay
 				if tally.0 > tally.1 + tally.2 {
 					Self::kill_veto_of(&proposal_hash);
 					// If there were no nay-votes from the council, then it's weakly uncontroversial; we enact immediately.
@@ -474,7 +502,10 @@ mod tests {
 			System::set_block_number(2);
 			assert_ok!(CouncilVoting::end_block(System::block_number()));
 			assert_eq!(CouncilVoting::proposals().len(), 0);
-			assert_eq!(Democracy::active_referenda(), vec![(0, ReferendumInfo::new(5, proposal, VoteThreshold::SuperMajorityAgainst, 0))]);
+			assert_eq!(
+				Democracy::active_referenda(),
+				vec![(0, ReferendumInfo::new(5, proposal, VoteThreshold::SuperMajorityAgainst, 0))]
+			);
 		});
 	}
 
@@ -492,7 +523,10 @@ mod tests {
 			System::set_block_number(2);
 			assert_ok!(CouncilVoting::end_block(System::block_number()));
 			assert_eq!(CouncilVoting::proposals().len(), 0);
-			assert_eq!(Democracy::active_referenda(), vec![(0, ReferendumInfo::new(5, proposal, VoteThreshold::SimpleMajority, 0))]);
+			assert_eq!(
+				Democracy::active_referenda(),
+				vec![(0, ReferendumInfo::new(5, proposal, VoteThreshold::SimpleMajority, 0))]
+			);
 		});
 	}
 
@@ -501,7 +535,10 @@ mod tests {
 		with_externalities(&mut new_test_ext(true), || {
 			System::set_block_number(1);
 			let proposal = set_balance_proposal(42);
-			assert_noop!(CouncilVoting::propose(Origin::signed(4), Box::new(proposal)), "proposer would not be on council");
+			assert_noop!(
+				CouncilVoting::propose(Origin::signed(4), Box::new(proposal)),
+				"proposer would not be on council"
+			);
 		});
 	}
 
@@ -511,7 +548,10 @@ mod tests {
 			System::set_block_number(1);
 			let proposal = set_balance_proposal(42);
 			assert_ok!(CouncilVoting::propose(Origin::signed(1), Box::new(proposal.clone())));
-			assert_noop!(CouncilVoting::vote(Origin::signed(4), proposal.blake2_256().into(), true), "only councillors may vote on council proposals");
+			assert_noop!(
+				CouncilVoting::vote(Origin::signed(4), proposal.blake2_256().into(), true),
+				"only councillors may vote on council proposals"
+			);
 		});
 	}
 }
