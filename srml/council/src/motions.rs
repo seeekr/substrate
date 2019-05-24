@@ -67,7 +67,12 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: <T as system::Trait>::Origin {
 		fn deposit_event<T>() = default;
 
-		/// Make a proposal. Only councillors can make proposals.
+		/// Make a proposal. `threshold` indicates the number of yes-votes needed for the proposal
+		/// to execute.
+		///
+		/// The proposal must be unique.
+		///
+		/// The dispatch origin of this call must be signed by a _councillor_.
 		fn propose(origin, #[compact] threshold: u32, proposal: Box<<T as Trait>::Proposal>) {
 			let who = ensure_signed(origin)?;
 
@@ -91,7 +96,16 @@ decl_module! {
 			}
 		}
 
-		/// Vote on a proposal. Only councillors can vote on proposals.
+		/// Vote on a proposal.
+		///
+		/// The proposal hash and the index of the voting must be correctly provided.
+		/// A voter can change their vote from yet to no, but duplicate votes will raise an error.
+		///
+		/// Each submitted vote _might_ cause the proposal to be executed, if the required
+		/// threshold is reached. Similarly, enough no-votes can cause the proposal to be
+		/// removed from storage.
+		///
+		/// The dispatch origin of this call must be signed by a _councillor_.
 		fn vote(origin, proposal: T::Hash, #[compact] index: ProposalIndex, approve: bool) {
 			let who = ensure_signed(origin)?;
 
@@ -161,7 +175,7 @@ decl_storage! {
 		/// The (hashes of) the active proposals.
 		pub Proposals get(proposals): Vec<T::Hash>;
 		/// Actual proposal for a given hash, if it's current.
-		pub ProposalOf get(proposal_of): map T::Hash => Option< <T as Trait>::Proposal >;
+		pub ProposalOf get(proposal_of): map T::Hash => Option<<T as Trait>::Proposal>;
 		/// Votes for a given proposal: (proposal_index, required_yes_votes, yes_voters, no_voters).
 		pub Voting get(voting): map T::Hash => Option<(ProposalIndex, u32, Vec<T::AccountId>, Vec<T::AccountId>)>;
 		/// Proposals so far.
@@ -212,6 +226,10 @@ mod tests {
 	use system::{EventRecord, Phase};
 	use hex_literal::hex;
 
+	fn set_balance_proposal(value: u64) -> Call {
+		Call::Balances(balances::Call::set_balance(42, value.into(), 0))
+	}
+
 	#[test]
 	fn motions_basic_environment_works() {
 		with_externalities(&mut new_test_ext(true), || {
@@ -219,10 +237,6 @@ mod tests {
 			assert_eq!(Balances::free_balance(&42), 0);
 			assert_eq!(CouncilMotions::proposals(), Vec::<H256>::new());
 		});
-	}
-
-	fn set_balance_proposal(value: u64) -> Call {
-		Call::Balances(balances::Call::set_balance(42, value.into(), 0))
 	}
 
 	#[test]

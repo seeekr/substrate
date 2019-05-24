@@ -34,8 +34,10 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		fn deposit_event<T>() = default;
 
-		/// Make a proposal. Only councillors can make a proposal and the proposer must
-		/// still be a councillor when the vote will occur.
+		/// Make a proposal.
+		///
+		/// The dispatch origin of this call must be signed by a _councillor_ by the time
+		/// the proposal is subject to voting.
 		fn propose(origin, proposal: Box<T::Proposal>) {
 			let who = ensure_signed(origin)?;
 
@@ -57,7 +59,9 @@ decl_module! {
 			<CouncilVoteOf<T>>::insert((proposal_hash, who.clone()), true);
 		}
 
-		/// Vote on a proposal. Only councillors may vote on council proposals.
+		/// Vote on a proposal.
+		///
+		/// The dispatch origin of this call must be signed by a _councillor_.
 		fn vote(origin, proposal: T::Hash, approve: bool) {
 			let who = ensure_signed(origin)?;
 
@@ -69,7 +73,9 @@ decl_module! {
 			<CouncilVoteOf<T>>::insert((proposal, who), approve);
 		}
 
-		/// Veto a proposal. Only councillors may veto council proposals.
+		/// Veto a proposal.
+		///
+		/// The dispatch origin of this call must be signed by a _councillor_.
 		fn veto(origin, proposal_hash: T::Hash) {
 			let who = ensure_signed(origin)?;
 
