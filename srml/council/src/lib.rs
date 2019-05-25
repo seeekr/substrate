@@ -18,15 +18,15 @@
 //!
 //! The Council module provides tools to manage the council and proposals. The main components are:
 //!
-//! - **Seats**: election of councillors.
+//! - **Council Seats**: Election of councillors.
 //! 	- [`seats::Trait`](./seats/trait.Trait.html)
 //! 	- [`Call`](./seats/enum.Call.html)
 //! 	- [`Module`](./seats/struct.Module.html)
-//! - **Motions**: proposals and voting among councillors.
+//! - **Council Motions**: Proposals and voting among councillors.
 //! 	- [`motions::Trait`](./motions/trait.Trait.html)
 //! 	- [`Call`](./motions/enum.Call.html)
 //! 	- [`Module`](./motions/struct.Module.html)
-//! - **Voting**: Proposals sent to [`Democracy Module`](../srml_democracy/index.html) for public referendum.
+//! - **Council Voting**: Proposals sent to [`Democracy Module`](../srml_democracy/index.html) for public referendum.
 //! 	- [`voting::Trait`](./voting/trait.Trait.html)
 //! 	- [`Call`](./voting/enum.Call.html)
 //! 	- [`Module`](./voting/struct.Module.html)
@@ -36,10 +36,10 @@
 //! The Council module provides functionality to handle:
 //!
 //! - The voting in and maintenance of council members.
-//! - Proposing, vetoing, and passing motions, either internally or through public referendum.
+//! - Proposing, vetoing, and passing motions.
 //!
-//! The Council's role is to represent passive stakeholders. The Council is an on-chain entity comprised of
-//! a set of account IDs. Its primary tasks are to propose sensible referenda and thwart any uncontroversially
+//! The Council is an on-chain entity comprised of a set of account IDs, with the role of representing
+//! passive stakeholders. Its primary tasks are to propose sensible referenda and thwart any uncontroversially
 //! dangerous or malicious referenda.
 //!
 //! ### Terminology details
@@ -58,7 +58,11 @@
 //! if the number of nay votes are more than to be compensated by all the other councillors
 //! (who have not voted) voting yay, the proposal is dropped.
 //!
-//! #### Council Proposal Voting (voting.rs)
+//! Note that council motion has a special origin type, [`seats::Origin`](./motions/enum.Origin.html), that limits
+//! which calls can be dispatched. The [Treasury](../srml_treasury/index.html) module is an example that uses
+//! council motion origin.
+//!
+//! #### Council Voting (voting.rs)
 //!
 //! Proposals that Proposed by and voted upon by councillors. Unlike motion proposals, if a proposal is approved,
 //! it is _elevated_ to the democracy module as a public referendum.
@@ -83,6 +87,9 @@
 //! referendum will require a vote threshold of supermajority against to prevent it. Otherwise,
 //! it is a simple majority vote. See [`VoteThreshold`](../srml_democracy/enum.VoteThreshold.html) in the
 //! Democracy module for more details on how votes are approved.
+//!
+//! As opposed to motions, proposals executed through the democracy module have the
+//! root origin which gives them the highest privilege.
 //!
 //! #### Council Seats (seats.rs)
 //!
@@ -175,7 +182,7 @@
 //! ### Example
 //!
 //! This code snippet includes an `approve_all` public function that could be called to approve all
-//! existing candidates, without having to check the number of them.
+//! existing candidates, if a tally is scheduled to happen, without having to check the number of them.
 //!
 //! ```
 //! use srml_support::{decl_module, dispatch::Result};
@@ -191,12 +198,15 @@
 //! 			// Get the appropriate block number to schedule the next tally.
 //! 			let maybe_next_tally = <seats::Module<T>>::next_tally();
 //!
-//! 			// Create votes.
-//! 			let candidate_count = <seats::Module<T>>::candidate_count();
-//! 			let votes = (0..candidate_count).map(|_| true).collect::<_>();
+//! 			if maybe_next_tally.is_some() {
+//! 				// Create votes.
+//! 				let candidate_count = <seats::Module<T>>::candidate_count();
+//! 				let votes = vec![true; candidate_count as usize];
 //!
-//!				<seats::Module<T>>::set_approvals(origin, votes, vote_index)?;
+//!					<seats::Module<T>>::set_approvals(origin, votes, vote_index)?;
+//! 			}
 //!
+//!				// either way return `Ok`. You can change this and return an `Err` based on what you need.
 //! 			Ok(())
 //! 		}
 //! 	}
@@ -215,6 +225,10 @@
 //!
 //! - [Democracy](../srml_democracy/index.html)
 //! - [Staking](../srml_staking/index.html)
+//!
+//! ## Further Reading
+//!
+//! - [Polkadot wiki](https://wiki.polkadot.network/en/latest/polkadot/learn/governance/) on _Governance_.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
