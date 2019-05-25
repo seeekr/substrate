@@ -65,7 +65,7 @@
 //!
 //! - **Proposal validity:** A council proposal is valid when it's unique, hasn't yet been vetoed, and
 //! when the proposing councillor's term doesn't expire before the block number when the proposal's voting period ends.
-//! A proposal is a generic type that can be _dispatched_ (similar to variants of the [`Call`] enum in each module).
+//! A proposal is a generic type that can be _dispatched_ (similar to variants of the `Call` enum in each module).
 //! - **Proposal postponement:** Councillors that abstain from voting may postpone a council proposal from
 //! being approved or rejected. Postponement is equivalent to a veto, which only lasts for the cooloff period.
 //! - **Cooloff period:** Period, in blocks, for which a veto is in effect.
@@ -174,9 +174,8 @@
 //!
 //! ### Example
 //!
-//! This code snippet includes an `approve_all` public function that could be called to approve
-//! the eligibility of all candidates when there are empty council seats and when the tally for
-//! the next election occurs at the current or a future block number.
+//! This code snippet includes an `approve_all` public function that could be called to approve all
+//! existing candidates, without having to check the number of them.
 //!
 //! ```
 //! use srml_support::{decl_module, dispatch::Result};
@@ -188,29 +187,15 @@
 //! decl_module! {
 //! 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 //!
-//! 		pub fn approve_all(origin) -> Result {
-//! 			let _origin = ensure_signed(origin)?;
-//!
-//! 			// Get the current block number
-//! 			let current_block_number = <system::Module<T>>::block_number();
-//!
-//! 			// Get the number of seats that we want the council to have
-//! 			let desired = <seats::Module<T>>::desired_seats() as usize;
-//!
-//! 			// Get the number of seats occupied by the current council.
-//! 			let occupied = <seats::Module<T>>::active_council().len();
-//!
+//! 		pub fn approve_all(origin, vote_index: u32) -> Result {
 //! 			// Get the appropriate block number to schedule the next tally.
 //! 			let maybe_next_tally = <seats::Module<T>>::next_tally();
 //!
-//! 			assert!(desired > occupied, "Unable to approve all candidates when there are no empty seats");
+//! 			// Create votes.
+//! 			let candidate_count = <seats::Module<T>>::candidate_count();
+//! 			let votes = (0..candidate_count).map(|_| true).collect::<_>();
 //!
-//! 			if let Some(next_tally_block_number) = <seats::Module<T>>::next_tally() {
-//! 				if current_block_number <= next_tally_block_number {
-//! 					assert!(maybe_next_tally.is_some(),
-//! 						"Unable to approve all candidates when the block number of the next tally has past");
-//! 				}
-//! 			}
+//!				<seats::Module<T>>::set_approvals(origin, votes, vote_index)?;
 //!
 //! 			Ok(())
 //! 		}

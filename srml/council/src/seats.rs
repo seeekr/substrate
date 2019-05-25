@@ -106,7 +106,7 @@ decl_module! {
 
 		/// Set candidate approvals. Approval slots stay valid as long as candidates in those slots
 		/// are registered.
-		fn set_approvals(origin, votes: Vec<bool>, #[compact] index: VoteIndex) -> Result {
+		pub fn set_approvals(origin, votes: Vec<bool>, #[compact] index: VoteIndex) -> Result {
 			let who = ensure_signed(origin)?;
 			Self::do_set_approvals(who, votes, index)
 		}
