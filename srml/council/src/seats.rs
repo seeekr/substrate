@@ -151,7 +151,8 @@ decl_module! {
 				.any(|(&appr, addr)|
 					 appr &&
 					 *addr != T::AccountId::default() &&
-					 Self::candidate_reg_info(addr).map_or(false, |x| x.0 <= last_active)/*defensive only: all items in candidates list are registered*/
+					 /*defensive only: all items in candidates list are registered*/
+					 Self::candidate_reg_info(addr).map_or(false, |x| x.0 <= last_active)
 				);
 
 			Self::remove_voter(
@@ -235,7 +236,10 @@ decl_module! {
 			let stakes = Self::snapshoted_stakes();
 			let voters = Self::voters();
 			let bad_presentation_punishment = Self::present_slash_per_voter() * BalanceOf::<T>::from(voters.len() as u32);
-			ensure!(T::Currency::can_slash(&who, bad_presentation_punishment), "presenter must have sufficient slashable funds");
+			ensure!(
+				T::Currency::can_slash(&who, bad_presentation_punishment),
+				"presenter must have sufficient slashable funds"
+			);
 
 			let mut leaderboard = Self::leaderboard().ok_or("leaderboard must exist while present phase active")?;
 			ensure!(total > leaderboard[0].0, "candidate not worthy of leaderboard");
@@ -797,7 +801,10 @@ mod tests {
 
 			assert_eq!(Council::candidates().len(), 0);
 
-			assert_noop!(Council::set_approvals(Origin::signed(4), vec![], 0), "number of candidates to receive approval votes should be non-zero");
+			assert_noop!(
+				Council::set_approvals(Origin::signed(4), vec![], 0),
+				"number of candidates to receive approval votes should be non-zero"
+			);
 		});
 	}
 
@@ -809,7 +816,10 @@ mod tests {
 			assert_ok!(Council::submit_candidacy(Origin::signed(5), 0));
 			assert_eq!(Council::candidates().len(), 1);
 
-			assert_noop!(Council::set_approvals(Origin::signed(4), vec![true, true], 0), "number of candidate approval votes cannot exceed number of candidates");
+			assert_noop!(Council::set_approvals(
+				Origin::signed(4), vec![true, true], 0),
+				"number of candidate approval votes cannot exceed number of candidates"
+			);
 		});
 	}
 
@@ -954,7 +964,10 @@ mod tests {
 			assert_ok!(Council::end_block(System::block_number()));
 
 			System::set_block_number(6);
-			assert_noop!(Council::present_winner(Origin::signed(4), 2, 0, 0), "stake deposited to present winner and be added to leaderboard should be non-zero");
+			assert_noop!(
+				Council::present_winner(Origin::signed(4), 2, 0, 0),
+				"stake deposited to present winner and be added to leaderboard should be non-zero"
+			);
 		});
 	}
 
@@ -1033,7 +1046,10 @@ mod tests {
 			assert_ok!(Council::end_block(System::block_number()));
 
 			System::set_block_number(10);
-			assert_noop!(Council::present_winner(Origin::signed(4), 2, 20, 1), "candidate must not form a duplicated member if elected");
+			assert_noop!(
+				Council::present_winner(Origin::signed(4), 2, 20, 1),
+				"candidate must not form a duplicated member if elected"
+			);
 		});
 	}
 
@@ -1279,7 +1295,10 @@ mod tests {
 		with_externalities(&mut new_test_ext(false), || {
 			System::set_block_number(4);
 			assert!(!Council::presentation_active());
-			assert_noop!(Council::present_winner(Origin::signed(5), 5, 1, 0), "cannot present outside of presentation period");
+			assert_noop!(
+				Council::present_winner(Origin::signed(5), 5, 1, 0),
+				"cannot present outside of presentation period"
+			);
 		});
 	}
 
@@ -1313,7 +1332,10 @@ mod tests {
 			System::set_block_number(6);
 			assert_eq!(Balances::free_balance(&1), 1);
 			assert_eq!(Balances::reserved_balance(&1), 9);
-			assert_noop!(Council::present_winner(Origin::signed(1), 1, 20, 0), "presenter must have sufficient slashable funds");
+			assert_noop!(
+				Council::present_winner(Origin::signed(1), 1, 20, 0),
+				"presenter must have sufficient slashable funds"
+			);
 		});
 	}
 
