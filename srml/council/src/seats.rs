@@ -331,11 +331,11 @@ decl_storage! {
 		pub VotingPeriod get(voting_period) config(approval_voting_period): T::BlockNumber = 1000.into();
 		/// How long (in blocks) each position is active for.
 		pub TermDuration get(term_duration) config(): T::BlockNumber = 5.into();
-		/// Number of accounts that should be sitting on the Council.
+		/// Number of accounts that should be sitting on the council.
 		pub DesiredSeats get(desired_seats) config(): u32;
 
 		// permanent state (always relevant, changes only at the finalization of voting)
-		/// The current Council. When there's a vote going on, this should still be used for executive
+		/// The current council. When there's a vote going on, this should still be used for executive
 		/// matters. The block number (second element in the tuple) is the block that the associated
 		/// account ID's position is active until (calculated by the sum of the block number when the
 		/// council member was elected and his or her term duration).
