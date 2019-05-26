@@ -36,10 +36,10 @@ decl_module! {
 
 		/// Make a proposal.
 		///
-		/// A councillor vote of from `origin` is applied by default.
+		/// A councillor vote of yay from `origin` is applied by default.
 		///
 		/// The dispatch origin of this call must be signed by a _councillor_ by the time
-		/// the proposal is subject to voting. See [`voting_period`](./voting/struct.VotingPeriod.html)
+		/// the proposal is subject to voting. See [`voting_period`](./voting/struct.VotingPeriod.html).
 		fn propose(origin, proposal: Box<T::Proposal>) {
 			let who = ensure_signed(origin)?;
 
@@ -80,9 +80,9 @@ decl_module! {
 		/// A proposal cannot be vetoed while in the cooloff period.
 		/// A proposal cannot be vetoed twice by the same account.
 		///
-		/// The proposal information, including voters, are removed and only veto information is kept
-		/// to keep track of when the proposal can be re-proposed, and to make sure no single councillor
-		/// can veto twice.
+		/// The proposal information, including voters, is removed and only veto information is kept
+		/// to indicate when the proposal can be re-proposed, and to make sure that no single councillor
+		/// can veto it twice.
 		///
 		/// The dispatch origin of this call must be signed by a _councillor_.
 		fn veto(origin, proposal_hash: T::Hash) {
@@ -138,7 +138,8 @@ decl_storage! {
 		pub CooloffPeriod get(cooloff_period) config(): T::BlockNumber = 1000.into();
 		/// Period (in blocks) that a vote is open for.
 		pub VotingPeriod get(voting_period) config(): T::BlockNumber = 3.into();
-		/// Number of blocks by which to delay enactment of successful, non-unanimous-council-instigated referendum proposals.
+		/// Number of blocks by which to delay enactment of successful,
+		/// non-unanimous, Council-instigated referendum proposals.
 		pub EnactDelayPeriod get(enact_delay_period) config(): T::BlockNumber = 0.into();
 		/// A list of proposals by block number and proposal ID.
 		pub Proposals get(proposals) build(|_| vec![]): Vec<(T::BlockNumber, T::Hash)>; // ordered by expiry.
@@ -146,7 +147,7 @@ decl_storage! {
 		pub ProposalOf get(proposal_of): map T::Hash => Option<T::Proposal>;
 		/// List of voters that have voted on a proposal ID.
 		pub ProposalVoters get(proposal_voters): map T::Hash => Vec<T::AccountId>;
-		/// Map from a proposal ID and voter to the outcome of the vote.
+		/// Map from a proposal ID and voter to the outcome of the vote. True indicates that it passed.
 		pub CouncilVoteOf get(vote_of): map (T::Hash, T::AccountId) => Option<bool>;
 		/// A veto of a proposal. The veto has an expiry (block number) and a list of vetoers.
 		pub VetoedProposal get(veto_of): map T::Hash => Option<(T::BlockNumber, Vec<T::AccountId>)>;
@@ -223,7 +224,7 @@ impl<T: Trait> Module<T> {
 		<Proposals<T>>::put(p);
 	}
 
-	/// return the proposal that was supposed to be expired at block number `n`.
+	/// Return the proposal that was supposed to be expired at block number `n`.
 	///
 	/// The proposal is removed from storage, if any exists.
 	fn take_proposal_if_expiring_at(n: T::BlockNumber) -> Option<(T::Proposal, T::Hash)> {
@@ -242,9 +243,11 @@ impl<T: Trait> Module<T> {
 	/// Checks for the end of the voting period at the end of each block.
 	///
 	/// Might end up:
-	///   - cancel a referendum.
-	///   - enact immediately or with a delay
-	/// based on the votes and the type of the proposal
+	///
+	///   - cancelling a referendum, or
+	///   - enacting immediately or with a delay
+	///
+	/// based on the votes and the type of the proposal.
 	fn end_block(now: T::BlockNumber) -> Result {
 		while let Some((proposal, proposal_hash)) = Self::take_proposal_if_expiring_at(now) {
 			let tally = Self::take_tally(&proposal_hash);

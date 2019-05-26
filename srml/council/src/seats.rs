@@ -324,18 +324,18 @@ decl_storage! {
 		pub CarryCount get(carry_count) config(): u32 = 2;
 		/// How long to give each top candidate to present themselves after the vote ends.
 		pub PresentationDuration get(presentation_duration) config(): T::BlockNumber = 1000.into();
-		/// How many vote indexes need to go by after a target voter's last vote before they can be reaped if their
+		/// How many vote indices need to go by after a target voter's last vote before they can be reaped if their
 		/// approvals are moot.
 		pub InactiveGracePeriod get(inactivity_grace_period) config(inactive_grace_period): VoteIndex = 1;
 		/// How often (in blocks) to check for new votes.
 		pub VotingPeriod get(voting_period) config(approval_voting_period): T::BlockNumber = 1000.into();
-		/// How long each position is active for.
+		/// How long (in blocks) each position is active for.
 		pub TermDuration get(term_duration) config(): T::BlockNumber = 5.into();
-		/// Number of accounts that should be sitting on the council.
+		/// Number of accounts that should be sitting on the Council.
 		pub DesiredSeats get(desired_seats) config(): u32;
 
 		// permanent state (always relevant, changes only at the finalization of voting)
-		/// The current council. When there's a vote going on, this should still be used for executive
+		/// The current Council. When there's a vote going on, this should still be used for executive
 		/// matters. The block number (second element in the tuple) is the block that the associated
 		/// account ID's position is active until (calculated by the sum of the block number when the
 		/// council member was elected and his or her term duration).

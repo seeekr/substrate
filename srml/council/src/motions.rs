@@ -39,7 +39,7 @@ pub trait Trait: CouncilTrait {
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
-/// Origin for the council module.
+/// Origin for the Council module.
 #[derive(PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub enum Origin {
@@ -49,10 +49,10 @@ pub enum Origin {
 
 decl_event!(
 	pub enum Event<T> where <T as system::Trait>::Hash, <T as system::Trait>::AccountId {
-		/// A motion (given hash) has been proposed (by given account) with a threshold (given u32).
+		/// A motion (given hash) has been proposed (by given account) with a threshold (given `u32`).
 		Proposed(AccountId, ProposalIndex, Hash, u32),
 		/// A motion (given hash) has been voted on by given account, leaving
-		/// a tally (yes votes and no votes given as u32s respectively).
+		/// a tally (yes votes and no votes given as `u32`s respectively).
 		Voted(AccountId, Hash, bool, u32, u32),
 		/// A motion was approved by the required threshold.
 		Approved(Hash),
@@ -99,9 +99,9 @@ decl_module! {
 		/// Vote on a proposal.
 		///
 		/// The proposal hash and the index of the voting must be correctly provided.
-		/// A voter can change their vote from yet to no, but duplicate votes will raise an error.
+		/// A voter can change their vote from yes to no, but duplicate votes will raise an error.
 		///
-		/// Each submitted vote _might_ cause the proposal to be executed, if the required
+		/// Each submitted vote _may_ cause the proposal to be executed, if the required
 		/// threshold is reached. Similarly, enough no-votes can cause the proposal to be
 		/// removed from storage.
 		///
@@ -176,7 +176,7 @@ decl_storage! {
 		pub Proposals get(proposals): Vec<T::Hash>;
 		/// Actual proposal for a given hash, if it's current.
 		pub ProposalOf get(proposal_of): map T::Hash => Option<<T as Trait>::Proposal>;
-		/// Votes for a given proposal: (proposal_index, required_yes_votes, yes_voters, no_voters).
+		/// Votes for a given proposal: (Proposal index, required yes votes, yes voters, no voters).
 		pub Voting get(voting): map T::Hash => Option<(ProposalIndex, u32, Vec<T::AccountId>, Vec<T::AccountId>)>;
 		/// Proposals so far.
 		pub ProposalCount get(proposal_count): u32;
