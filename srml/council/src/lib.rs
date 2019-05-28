@@ -22,7 +22,7 @@
 //! 	- [`seats::Trait`](./seats/trait.Trait.html)
 //! 	- [`Call`](./seats/enum.Call.html)
 //! 	- [`Module`](./seats/struct.Module.html)
-//! - **Council Motions:** Proposals and voting among councillors.
+//! - **Council Motions:** Voting as a body to dispatch calls from the special `Council` origin.
 //! 	- [`motions::Trait`](./motions/trait.Trait.html)
 //! 	- [`Call`](./motions/enum.Call.html)
 //! 	- [`Module`](./motions/struct.Module.html)
