@@ -105,7 +105,7 @@ use system::{ensure_signed, RawOrigin};
 use substrate_primitives::storage::well_known_keys::CHILD_STORAGE_KEY_PREFIX;
 use timestamp;
 
-pub use exec::{AccountIdOf, SeedOf};
+pub use exec::{AccountIdOf, SeedOf, MomentOf};
 
 pub type CodeHash<T> = <T as system::Trait>::Hash;
 pub type TrieId = Vec<u8>;
