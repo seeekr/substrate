@@ -65,7 +65,7 @@
 //! #### Council Voting (voting.rs)
 //!
 //! Proposals that are proposed by and voted upon by councillors. Unlike motion proposals, if a proposal is approved,
-//! it is _elevated_ to the Democracy module as a public referendum.
+//! it is _elevated_ to the Democracy module as a referendum.
 //!
 //! - **Proposal validity:** A council proposal is valid when it's unique, hasn't yet been vetoed, and
 //! when the proposing councillor's term doesn't expire before the block number when the proposal's voting period ends.
