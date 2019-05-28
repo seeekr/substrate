@@ -54,13 +54,13 @@
 //! - **Vote:** A vote of yay or nay from a councillor on a single proposal. Councillors may change their vote but a
 //!   duplicate vote will return an error.
 //!
-//! Upon each vote, if the threshold is reached, the proposal is is executed. Similarly,
+//! Upon each vote, if the threshold is reached, the proposal is is dispatched from the `Council` origin. Similarly,
 //! if the number of nay votes is high enough such that it could not pass even if all other councillors
 //! (including those who have not voted) voted yay, the proposal is dropped.
 //!
 //! Note that a council motion has a special origin type, [`seats::Origin`](./motions/enum.Origin.html), that limits
-//! which calls can be dispatched. The [Treasury](../srml_treasury/index.html) module is an example that uses the
-//! council motion origin.
+//! which calls can be effectively dispatched. The [Treasury](../srml_treasury/index.html) module is an example 
+//! that uses the council motion origin.
 //!
 //! #### Council Voting (voting.rs)
 //!
