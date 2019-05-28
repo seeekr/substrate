@@ -70,8 +70,8 @@
 //! - **Proposal validity:** A council proposal is valid when it's unique, hasn't yet been vetoed, and
 //! when the proposing councillor's term doesn't expire before the block number when the proposal's voting period ends.
 //! A proposal is a generic type that can be _dispatched_ (similar to variants of the `Call` enum in each module).
-//! - **Proposal postponement:** Councillors that abstain from voting may postpone a council proposal from
-//! being approved or rejected. Postponement is equivalent to a veto, which only lasts for the cooloff period.
+//! - **Proposal postponement:** Councillors may postpone a council proposal from being approved or rejected.
+//! Postponement is equivalent to a veto, which only lasts for the cooloff period.
 //! - **Cooloff period:** Period, in blocks, for which a veto is in effect.
 //! - **Referendum:** The means of public voting on a proposal.
 //! - **Veto:** A council member may veto any council proposal that exists. A vetoed proposal that's valid is set
@@ -83,7 +83,7 @@
 //! - **Voting process to elevate a proposal:** At the end of a given block we tally votes for expiring referenda.
 //! Referenda that are passed (yay votes are greater than nay votes plus abstainers) are sent to the Democracy
 //! module for a public referendum. If there are no nay votes (abstention is acceptable), then the proposal is
-//! for immediate enactment. Otherwise, there will be a delay period. If the vote is unanimous, then the public
+//! tabled immediately. Otherwise, there will be a delay period. If the vote is unanimous, then the public
 //! referendum will require a vote threshold of supermajority against to prevent it. Otherwise,
 //! it is a simple majority vote. See [`VoteThreshold`](../srml_democracy/enum.VoteThreshold.html) in the
 //! Democracy module for more details on how votes are approved.
@@ -122,7 +122,7 @@
 //! `O(|number_of_voters|)`, so the presenter must be slashable and will be slashed for duplicate or invalid
 //! presentations. Presentation is only allowed during the "presentation period," after voting has closed.
 //! - **Voting bond:** Bond required to be permitted to vote. Must be held because many voting operations affect
-//! storage. The bond is held to disincent abuse.
+//! storage. The bond is held to disincentivize abuse.
 //! - **Voting:** Process of inserting approvals for oneself into storage. Can be called by anyone given they submit
 //! an appropriate list of approvals. A bond is reserved from a voter until they retract or get reported.
 //! - **Inactive voter**: A voter whose approvals are now invalid
