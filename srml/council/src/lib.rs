@@ -22,7 +22,7 @@
 //! 	- [`seats::Trait`](./seats/trait.Trait.html)
 //! 	- [`Call`](./seats/enum.Call.html)
 //! 	- [`Module`](./seats/struct.Module.html)
-//! - **Council Motions:** Proposals and voting among councillors.
+//! - **Council Motions:** Voting as a body to dispatch calls from the special `Council` origin.
 //! 	- [`motions::Trait`](./motions/trait.Trait.html)
 //! 	- [`Call`](./motions/enum.Call.html)
 //! 	- [`Module`](./motions/struct.Module.html)
@@ -54,24 +54,24 @@
 //! - **Vote:** A vote of yay or nay from a councillor on a single proposal. Councillors may change their vote but a
 //!   duplicate vote will return an error.
 //!
-//! Upon each vote, if the threshold is reached, the proposal is is executed. Similarly,
+//! Upon each vote, if the threshold is reached, the proposal is is dispatched from the `Council` origin. Similarly,
 //! if the number of nay votes is high enough such that it could not pass even if all other councillors
 //! (including those who have not voted) voted yay, the proposal is dropped.
 //!
 //! Note that a council motion has a special origin type, [`seats::Origin`](./motions/enum.Origin.html), that limits
-//! which calls can be dispatched. The [Treasury](../srml_treasury/index.html) module is an example that uses the
-//! council motion origin.
+//! which calls can be effectively dispatched. The [Treasury](../srml_treasury/index.html) module is an example 
+//! that uses the council motion origin.
 //!
 //! #### Council Voting (voting.rs)
 //!
 //! Proposals that are proposed by and voted upon by councillors. Unlike motion proposals, if a proposal is approved,
-//! it is _elevated_ to the Democracy module as a public referendum.
+//! it is _elevated_ to the Democracy module as a referendum.
 //!
 //! - **Proposal validity:** A council proposal is valid when it's unique, hasn't yet been vetoed, and
 //! when the proposing councillor's term doesn't expire before the block number when the proposal's voting period ends.
 //! A proposal is a generic type that can be _dispatched_ (similar to variants of the `Call` enum in each module).
-//! - **Proposal postponement:** Councillors that abstain from voting may postpone a council proposal from
-//! being approved or rejected. Postponement is equivalent to a veto, which only lasts for the cooloff period.
+//! - **Proposal postponement:** Councillors may postpone a council proposal from being approved or rejected.
+//! Postponement is equivalent to a veto, which only lasts for the cooloff period.
 //! - **Cooloff period:** Period, in blocks, for which a veto is in effect.
 //! - **Referendum:** The means of public voting on a proposal.
 //! - **Veto:** A council member may veto any council proposal that exists. A vetoed proposal that's valid is set
@@ -83,7 +83,7 @@
 //! - **Voting process to elevate a proposal:** At the end of a given block we tally votes for expiring referenda.
 //! Referenda that are passed (yay votes are greater than nay votes plus abstainers) are sent to the Democracy
 //! module for a public referendum. If there are no nay votes (abstention is acceptable), then the proposal is
-//! for immediate enactment. Otherwise, there will be a delay period. If the vote is unanimous, then the public
+//! tabled immediately. Otherwise, there will be a delay period. If the vote is unanimous, then the public
 //! referendum will require a vote threshold of supermajority against to prevent it. Otherwise,
 //! it is a simple majority vote. See [`VoteThreshold`](../srml_democracy/enum.VoteThreshold.html) in the
 //! Democracy module for more details on how votes are approved.
@@ -122,7 +122,7 @@
 //! `O(|number_of_voters|)`, so the presenter must be slashable and will be slashed for duplicate or invalid
 //! presentations. Presentation is only allowed during the "presentation period," after voting has closed.
 //! - **Voting bond:** Bond required to be permitted to vote. Must be held because many voting operations affect
-//! storage. The bond is held to disincent abuse.
+//! storage. The bond is held to disincentivize abuse.
 //! - **Voting:** Process of inserting approvals for oneself into storage. Can be called by anyone given they submit
 //! an appropriate list of approvals. A bond is reserved from a voter until they retract or get reported.
 //! - **Inactive voter**: A voter whose approvals are now invalid
