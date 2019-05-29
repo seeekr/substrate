@@ -138,6 +138,13 @@ impl ::std::hash::Hash for Public {
 	}
 }
 
+#[cfg(not(feature = "std"))]
+impl ::core::hash::Hash for Public {
+	fn hash<H: ::core::hash::Hasher>(&self, state: &mut H) {
+		self.0.hash(state);
+	}
+}
+
 /// An Schnorrkel/Ristretto x25519 ("sr25519") signature.
 ///
 /// Instead of importing it for the local module, alias it to be available as a public type
