@@ -98,7 +98,7 @@ decl_module! {
 
 		/// Vote on a proposal.
 		///
-		/// The proposal hash and the index of the voting must be correctly provided.
+		/// The proposal hash and the index of the vote must be correctly provided.
 		/// A voter can change their vote from yes to no, but duplicate votes will raise an error.
 		///
 		/// Each submitted vote _may_ cause the proposal to be executed, if the required

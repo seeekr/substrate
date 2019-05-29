@@ -26,7 +26,7 @@
 //! 	- [`motions::Trait`](./motions/trait.Trait.html)
 //! 	- [`Call`](./motions/enum.Call.html)
 //! 	- [`Module`](./motions/struct.Module.html)
-//! - **Council Voting:** Proposals sent to [`Democracy Module`](../srml_democracy/index.html) for public referenda.
+//! - **Council Voting:** Proposals sent to the [`Democracy Module`](../srml_democracy/index.html) for public referenda.
 //! 	- [`voting::Trait`](./voting/trait.Trait.html)
 //! 	- [`Call`](./voting/enum.Call.html)
 //! 	- [`Module`](./voting/struct.Module.html)
@@ -54,18 +54,18 @@
 //! - **Vote:** A vote of yay or nay from a councillor on a single proposal. Councillors may change their vote but a
 //!   duplicate vote will return an error.
 //!
-//! Upon each vote, if the threshold is reached, the proposal is is dispatched from the `Council` origin. Similarly,
+//! Upon each vote, if the threshold is reached, the proposal is dispatched from the `Council` origin. Similarly,
 //! if the number of nay votes is high enough such that it could not pass even if all other councillors
 //! (including those who have not voted) voted yay, the proposal is dropped.
 //!
 //! Note that a council motion has a special origin type, [`seats::Origin`](./motions/enum.Origin.html), that limits
-//! which calls can be effectively dispatched. The [Treasury](../srml_treasury/index.html) module is an example 
+//! which calls can be effectively dispatched. The [Treasury](../srml_treasury/index.html) module is an example
 //! that uses the council motion origin.
 //!
 //! #### Council Voting (voting.rs)
 //!
 //! Proposals that are proposed by and voted upon by councillors. Unlike motion proposals, if a proposal is approved,
-//! it is _elevated_ to the Democracy module as a referendum.
+//! it is _elevated_ to the [`Democracy Module`](../srml_democracy/index.html) module as a referendum.
 //!
 //! - **Proposal validity:** A council proposal is valid when it's unique, hasn't yet been vetoed, and
 //! when the proposing councillor's term doesn't expire before the block number when the proposal's voting period ends.
@@ -214,7 +214,7 @@
 //! # fn main() { }
 //! ```
 //!
-//! ## Genesis config
+//! ## Genesis Config
 //!
 //! The Council module depends on the `GenesisConfig`.
 //!
