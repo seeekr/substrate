@@ -559,7 +559,7 @@ impl<'a, H, N, B, T, O, Exec> StateMachine<'a, H, N, B, T, O, Exec> where
 
 /// Prove execution using the given state backend, overlayed changes, and call executor.
 pub fn prove_execution<B, H, Exec>(
-	backend: B,
+	mut backend: B,
 	overlay: &mut OverlayedChanges,
 	exec: &Exec,
 	method: &str,
@@ -571,9 +571,9 @@ where
 	Exec: CodeExecutor<H>,
 	H::Out: Ord + 'static,
 {
-	let trie_backend = backend.try_into_trie_backend()
+	let trie_backend = backend.as_trie_backend()
 		.ok_or_else(|| Box::new(ExecutionError::UnableToGenerateProof) as Box<Error>)?;
-	prove_execution_on_trie_backend(&trie_backend, overlay, exec, method, call_data)
+	prove_execution_on_trie_backend(trie_backend, overlay, exec, method, call_data)
 }
 
 /// Prove execution using the given trie backend, overlayed changes, and call executor.
@@ -668,7 +668,7 @@ where
 
 /// Generate storage read proof.
 pub fn prove_read<B, H>(
-	backend: B,
+	mut backend: B,
 	key: &[u8]
 ) -> Result<(Option<Vec<u8>>, Vec<Vec<u8>>), Box<Error>>
 where
@@ -676,16 +676,16 @@ where
 	H: Hasher,
 	H::Out: Ord
 {
-	let trie_backend = backend.try_into_trie_backend()
+	let trie_backend = backend.as_trie_backend()
 		.ok_or_else(
 			||Box::new(ExecutionError::UnableToGenerateProof) as Box<Error>
 		)?;
-	prove_read_on_trie_backend(&trie_backend, key)
+	prove_read_on_trie_backend(trie_backend, key)
 }
 
 /// Generate child storage read proof.
 pub fn prove_child_read<B, H>(
-	backend: B,
+	mut backend: B,
 	storage_key: &[u8],
 	key: &[u8],
 ) -> Result<(Option<Vec<u8>>, Vec<Vec<u8>>), Box<Error>>
@@ -694,9 +694,9 @@ where
 	H: Hasher,
 	H::Out: Ord
 {
-	let trie_backend = backend.try_into_trie_backend()
+	let trie_backend = backend.as_trie_backend()
 		.ok_or_else(|| Box::new(ExecutionError::UnableToGenerateProof) as Box<Error>)?;
-	prove_child_read_on_trie_backend(&trie_backend, storage_key, key)
+	prove_child_read_on_trie_backend(trie_backend, storage_key, key)
 }
 
 
@@ -990,7 +990,8 @@ mod tests {
 			b"abc".to_vec() => b"2".to_vec(),
 			b"bbb".to_vec() => b"3".to_vec()
 		];
-		let backend = InMemory::<Blake2Hasher>::from(initial).try_into_trie_backend().unwrap();
+		let mut state = InMemory::<Blake2Hasher>::from(initial);
+		let backend = state.as_trie_backend().unwrap();
 		let mut overlay = OverlayedChanges {
 			committed: map![
 				b"aba".to_vec() => OverlayedValue::from(Some(b"1312".to_vec())),
@@ -1026,12 +1027,13 @@ mod tests {
 
 	#[test]
 	fn set_child_storage_works() {
-		let backend = InMemory::<Blake2Hasher>::default().try_into_trie_backend().unwrap();
+		let mut state = InMemory::<Blake2Hasher>::default();
+		let backend = state.as_trie_backend().unwrap();
 		let changes_trie_storage = InMemoryChangesTrieStorage::<Blake2Hasher, u64>::new();
 		let mut overlay = OverlayedChanges::default();
 		let mut ext = Ext::new(
 			&mut overlay,
-			&backend,
+			backend,
 			Some(&changes_trie_storage),
 			NeverOffchainExt::new()
 		);
