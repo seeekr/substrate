@@ -16,8 +16,8 @@
 
 use std::{
 	collections::{HashSet, HashMap},
-	hash,
-	sync::Arc,
+	hash::{self, Hash, Hasher},
+	sync::{Arc, atomic::{AtomicU64, Ordering}},
 	time,
 };
 
@@ -28,7 +28,7 @@ use crate::rotator::PoolRotator;
 use crate::watcher::Watcher;
 use serde::Serialize;
 use error_chain::bail;
-use log::debug;
+use log::{debug, error};
 
 use futures::sync::mpsc;
 use parking_lot::{Mutex, RwLock};
@@ -39,6 +39,7 @@ use sr_primitives::{
 };
 
 pub use crate::base_pool::Limit;
+use sr_primitives::traits::Extrinsic;
 
 /// Modification notification event stream type;
 pub type EventStream = mpsc::UnboundedReceiver<()>;
@@ -100,26 +101,39 @@ impl Default for Options {
 	}
 }
 
+type PoolInner<B> = RwLock<base::BasePool<
+	ExHash<B>,
+	ExtrinsicFor<B>,
+>>;
+
 /// Extrinsics pool.
 pub struct Pool<B: ChainApi> {
 	api: B,
 	options: Options,
 	listener: RwLock<Listener<ExHash<B>, BlockHash<B>>>,
-	pool: RwLock<base::BasePool<
-		ExHash<B>,
-		ExtrinsicFor<B>,
-	>>,
+	pool0: PoolInner<B>,
+	pool1: PoolInner<B>,
+	last_observed_block: AtomicU64,
 	import_notification_sinks: Mutex<Vec<mpsc::UnboundedSender<()>>>,
 	rotator: PoolRotator<ExHash<B>>,
 }
 
 impl<B: ChainApi> Pool<B> {
+	fn pool(&self) -> &PoolInner<B> {
+		match self.last_observed_block.load(Ordering::SeqCst) % 2 {
+			1 => &self.pool1,
+			_ => &self.pool0,
+		}
+	}
+
 	/// Imports a bunch of unverified extrinsics to the pool
 	pub fn submit_at<T>(&self, at: &BlockId<B::Block>, xts: T) -> Result<Vec<Result<ExHash<B>, B::Error>>, B::Error> where
 		T: IntoIterator<Item=ExtrinsicFor<B>>
 	{
 		let block_number = self.api.block_id_to_number(at)?
 			.ok_or_else(|| error::ErrorKind::Msg(format!("Invalid block id: {:?}", at)).into())?;
+
+		self.last_observed_block.store(block_number.as_(), Ordering::SeqCst);
 
 		let results = xts
 			.into_iter()
@@ -151,7 +165,18 @@ impl<B: ChainApi> Pool<B> {
 				}
 			})
 			.map(|tx| {
-				let imported = self.pool.write().import(tx?)?;
+				let tx = tx?;
+
+				let mut hasher = fxhash::FxHasher64::default();
+				tx.hash.hash(&mut hasher);
+				let tx_hash= hasher.finish();
+
+				let pool = match tx_hash % 2 {
+					1 => &self.pool1,
+					_ => &self.pool0,
+				};
+
+				let imported = pool.write().import(tx)?;
 
 				if let base::Imported::Ready { .. } = imported {
 					self.import_notification_sinks.lock().retain(|sink| sink.unbounded_send(()).is_ok());
@@ -172,7 +197,7 @@ impl<B: ChainApi> Pool<B> {
 	}
 
 	fn enforce_limits(&self) -> HashSet<ExHash<B>> {
-		let status = self.pool.read().status();
+		let status = self.pool().read().status();
 		let ready_limit = &self.options.ready;
 		let future_limit = &self.options.future;
 
@@ -182,7 +207,7 @@ impl<B: ChainApi> Pool<B> {
 			|| future_limit.is_exceeded(status.future, status.future_bytes) {
 			// clean up the pool
 			let removed = {
-				let mut pool = self.pool.write();
+				let mut pool = self.pool().write();
 				let removed = pool.enforce_limits(ready_limit, future_limit)
 					.into_iter().map(|x| x.hash.clone()).collect::<HashSet<_>>();
 				// ban all removed transactions
@@ -224,7 +249,7 @@ impl<B: ChainApi> Pool<B> {
 		let mut tags = Vec::with_capacity(extrinsics.len());
 		// Get details of all extrinsics that are already in the pool
 		let hashes = extrinsics.iter().map(|extrinsic| self.api.hash_and_length(extrinsic).0).collect::<Vec<_>>();
-		let in_pool = self.pool.read().by_hash(&hashes);
+		let in_pool = self.pool().read().by_hash(&hashes);
 		{
 			// Zip the ones from the pool with the full list (we get pairs `(Extrinsic, Option<TransactionDetails>)`)
 			let all = extrinsics.iter().zip(in_pool.iter());
@@ -282,7 +307,7 @@ impl<B: ChainApi> Pool<B> {
 		known_imported_hashes: impl IntoIterator<Item=ExHash<B>> + Clone,
 	) -> Result<(), B::Error> {
 		// Perform tag-based pruning in the base pool
-		let status = self.pool.write().prune_tags(tags);
+		let status = self.pool().write().prune_tags(tags);
 		// Notify event listeners of all transactions
 		// that were promoted to `Ready` or were dropped.
 		{
@@ -346,7 +371,7 @@ impl<B: ChainApi> Pool<B> {
 				.collect::<Vec<_>>()
 		};
 		let futures_to_remove: Vec<ExHash<B>> = {
-			let p = self.pool.read();
+			let p = self.pool().read();
 			let mut hashes = Vec::new();
 			for tx in p.futures() {
 				if self.rotator.ban_if_stale(&now, block_number, &tx) {
@@ -370,7 +395,9 @@ impl<B: ChainApi> Pool<B> {
 			api,
 			options,
 			listener: Default::default(),
-			pool: Default::default(),
+			pool0: Default::default(),
+			pool1: Default::default(),
+			last_observed_block: Default::default(),
 			import_notification_sinks: Default::default(),
 			rotator: Default::default(),
 		}
@@ -397,7 +424,7 @@ impl<B: ChainApi> Pool<B> {
 		debug!(target: "txpool", "Banning invalid transactions: {:?}", hashes);
 		self.rotator.ban(&time::Instant::now(), hashes.iter().cloned());
 
-		let invalid = self.pool.write().remove_invalid(hashes);
+		let invalid = self.pool().write().remove_invalid(hashes);
 
 		let mut listener = self.listener.write();
 		for tx in &invalid {
@@ -409,12 +436,12 @@ impl<B: ChainApi> Pool<B> {
 
 	/// Get an iterator for ready transactions ordered by priority
 	pub fn ready(&self) -> impl Iterator<Item=TransactionFor<B>> {
-		self.pool.read().ready()
+		self.pool().read().ready()
 	}
 
 	/// Returns pool status.
 	pub fn status(&self) -> base::Status {
-		self.pool.read().status()
+		self.pool().read().status()
 	}
 
 	/// Returns transaction hash
